@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Search, X } from 'lucide-react';
 import { Project } from '@/lib/projects';
 import ProjectCard from '@/components/ProjectCard';
@@ -11,8 +12,17 @@ interface ProjectGridProps {
 }
 
 export default function ProjectGrid({ projects, allTags }: ProjectGridProps) {
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  // Pre-fill tag from URL param e.g. /?tag=blockchain
+  useEffect(() => {
+    const tagParam = searchParams.get('tag');
+    if (tagParam) {
+      setSelectedTags([tagParam]);
+    }
+  }, [searchParams]);
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -29,7 +39,6 @@ export default function ProjectGrid({ projects, allTags }: ProjectGridProps) {
 
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
-      // Search filter
       const q = query.toLowerCase().trim();
       const matchesSearch =
         q === '' ||
@@ -37,7 +46,6 @@ export default function ProjectGrid({ projects, allTags }: ProjectGridProps) {
         project.description.toLowerCase().includes(q) ||
         project.tags.some((t) => t.toLowerCase().includes(q));
 
-      // Tag filter
       const matchesTags =
         selectedTags.length === 0 ||
         selectedTags.every((tag) => project.tags.includes(tag));
@@ -52,10 +60,10 @@ export default function ProjectGrid({ projects, allTags }: ProjectGridProps) {
 
   return (
     <div>
-      {/* Search + Filter */}
+      {/* Search + Filter Bar */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
-          {/* Search Bar */}
+          {/* Search */}
           <div className="relative max-w-2xl mx-auto">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-gray-400" />
@@ -77,7 +85,7 @@ export default function ProjectGrid({ projects, allTags }: ProjectGridProps) {
             )}
           </div>
 
-          {/* Tag Filter */}
+          {/* Tags */}
           <div className="flex flex-wrap gap-2 justify-center">
             {allTags.map((tag) => (
               <button
@@ -94,34 +102,32 @@ export default function ProjectGrid({ projects, allTags }: ProjectGridProps) {
             ))}
           </div>
 
-          {/* Active filters indicator + Clear */}
+          {/* Active filter indicator */}
           {hasActiveFilters && (
             <div className="flex items-center justify-center gap-3 text-sm text-gray-600 dark:text-gray-400">
               <span>
-                Showing <strong className="text-gray-900 dark:text-white">{filteredProjects.length}</strong> of{' '}
+                Showing{' '}
+                <strong className="text-gray-900 dark:text-white">{filteredProjects.length}</strong>
+                {' '}of{' '}
                 <strong className="text-gray-900 dark:text-white">{projects.length}</strong> projects
               </span>
               <button
                 onClick={clearFilters}
                 className="flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 font-medium"
               >
-                <X className="h-3 w-3" />
-                Clear filters
+                <X className="h-3 w-3" /> Clear filters
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Project Sections */}
+      {/* Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* No results */}
         {filteredProjects.length === 0 && (
           <div className="text-center py-16">
             <p className="text-5xl mb-4">🔍</p>
-            <p className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              No projects found
-            </p>
+            <p className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No projects found</p>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
               Try a different search term or remove some tag filters.
             </p>
@@ -134,53 +140,38 @@ export default function ProjectGrid({ projects, allTags }: ProjectGridProps) {
           </div>
         )}
 
-        {/* Featured */}
         {featured.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               ⭐ Featured Projects
-              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                ({featured.length})
-              </span>
+              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">({featured.length})</span>
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featured.map((project) => (
-                <ProjectCard key={project.name} project={project} />
-              ))}
+              {featured.map((p) => <ProjectCard key={p.name} project={p} />)}
             </div>
           </section>
         )}
 
-        {/* Pinned */}
         {pinned.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               📌 Pinned Projects
-              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                ({pinned.length})
-              </span>
+              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">({pinned.length})</span>
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {pinned.map((project) => (
-                <ProjectCard key={project.name} project={project} />
-              ))}
+              {pinned.map((p) => <ProjectCard key={p.name} project={p} />)}
             </div>
           </section>
         )}
 
-        {/* All Projects */}
         {regular.length > 0 && (
           <section>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
               📦 All Projects
-              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                ({regular.length})
-              </span>
+              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">({regular.length})</span>
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {regular.map((project) => (
-                <ProjectCard key={project.name} project={project} />
-              ))}
+              {regular.map((p) => <ProjectCard key={p.name} project={p} />)}
             </div>
           </section>
         )}
