@@ -24,9 +24,9 @@
 | API Key Encryption | ✅ | AES-256 encrypted API keys in MongoDB |
 | API Auth Middleware | ✅ | `x-cron-secret` / `x-api-key` protection |
 | `skill.md` | ✅ | Agent discovery file at `/skill.md` |
-| **API Health Checker** | ✅ | Live health check for 30+ free APIs |
-| **Auto-Discovery** | ✅ | Scan env vars, build capability map |
-| **API Integration** | ✅ | Find best API for any capability at `/tools` |
+| API Health Checker `/tools` | ✅ | Live health check for 30+ free APIs |
+| Auto-Discovery | ✅ | Scan env vars, build capability map |
+| **Skill System `/skills`** | ✅ | Full skill catalog with matcher & manifest |
 | Smart Contract (MVX) | 🔜 | Rust SC for EGLD payments on devnet |
 | NextAuth.js Login | 🔜 | User auth + MVX wallet linking |
 | Webhook from TheColony | 🔜 | Instant dispatch (vs 15-min polling) |
@@ -93,7 +93,8 @@ openclaw-hub/
 │   ├── activity/           # Activity log
 │   ├── analyst/            # AI analyst
 │   ├── project/            # Project detail pages
-│   ├── tools/              # API Health Dashboard (NEW)
+│   ├── tools/              # API Health Dashboard
+│   ├── skills/             # Skill catalog UI (NEW)
 │   └── api/
 │       ├── agents/         # Agent CRUD + loop endpoints
 │       ├── analyst/        # AI analysis endpoint
@@ -101,15 +102,17 @@ openclaw-hub/
 │       ├── sandbox/        # E2B code execution
 │       ├── wallet/         # MVX wallet queries
 │       ├── mcp/            # MCP tool endpoints
-│       └── tools/          # API checker & integration endpoints (NEW)
+│       ├── skills/         # Skill manifest + matcher (NEW)
+│       └── tools/          # API checker & integration endpoints
 │           ├── check/      # GET (cached) / POST (live check)
 │           └── integrate/  # POST — find best API for capability
 ├── lib/
 │   ├── db.ts               # MongoDB connection singleton
 │   ├── db-agents.ts        # Agent/Task/LoopRun repository
-│   ├── api-registry.ts     # Catalog of 30+ free APIs (NEW)
-│   ├── api-checker.ts      # Health check engine + auto-discovery (NEW)
-│   ├── models/             # TypeScript models (Agent, Task, LoopRun, User)
+│   ├── api-registry.ts     # Catalog of 30+ free APIs
+│   ├── api-checker.ts      # Health check engine + auto-discovery
+│   ├── skills.ts           # Skill definitions + manifest (NEW)
+│   ├── models/             # TypeScript models
 │   ├── agent-economy.ts    # TheColony + OpenTask integration
 │   ├── multiversx.ts       # MVX blockchain client
 │   ├── ai-analyst.ts       # OpenRouter AI integration
@@ -117,7 +120,7 @@ openclaw-hub/
 ├── components/             # Reusable UI components
 ├── data/                   # Static YAML project data
 ├── public/
-│   └── skill.md            # Agent discovery file
+│   └── skill.md            # Agent discovery file (updated)
 ├── middleware.ts            # API route protection
 ├── FREE_APIS.md             # Free API reference list
 └── .env.example             # Environment variable template
@@ -125,45 +128,66 @@ openclaw-hub/
 
 ---
 
+## ⚡ Skill System
+
+OpenClaw Hub exposes a full **skill catalog** that other agents and platforms can query.
+
+### Available Skills
+
+| Skill ID | Category | Cost | Latency | APIs |
+|----------|----------|------|---------|------|
+| `ai_completion` | AI | low | ~1500ms | OpenRouter, Groq, Gemini |
+| `code_analysis` | Code | low | ~2000ms | OpenRouter, Groq |
+| `code_execution` | Code | free | ~3000ms | E2B |
+| `web_search` | Search | free | ~800ms | Tavily, Brave, DuckDuckGo |
+| `web_scraping` | Content | free | ~2000ms | Jina Reader, Firecrawl |
+| `multiversx_query` | Blockchain | free | ~500ms | MVX API |
+| `crypto_prices` | Blockchain | free | ~400ms | CoinGecko, CoinCap |
+| `knowledge_lookup` | Data | free | ~300ms | Wikipedia |
+| `weather_data` | Data | free | ~300ms | Open Meteo |
+| `task_execution` | Economy | free | ~5000ms | TheColony, OpenTask |
+| `ip_lookup` | Utility | free | ~300ms | IPapi |
+| `qr_generation` | Utility | free | ~200ms | QR Server |
+| `package_lookup` | Code | free | ~300ms | npm Registry |
+
+### Skill Discovery Endpoints
+
+```bash
+# Full skill catalog
+GET /api/skills
+
+# Compact manifest (machine-readable, for agents)
+GET /api/skills?format=compact
+
+# Single skill
+GET /api/skills?id=web_search
+
+# Filter by category
+GET /api/skills?category=blockchain
+
+# Filter by agent type
+GET /api/skills?agentType=coder
+
+# Match a natural language task to skills
+POST /api/skills
+{ "task": "search the web for latest MultiversX news" }
+# → { suggestions: [{ id: "web_search", score: 3, ... }] }
+```
+
+---
+
 ## 🛠️ API Tools System
 
-OpenClaw Hub includes a built-in **API health checker and integration engine** at `/tools`.
-
-### Health Check
 ```bash
-# Check all keyless APIs (no config needed)
-curl -X POST /api/tools/check -H 'Content-Type: application/json' \
-  -d '{"mode": "keyless"}'
+# Check all keyless APIs
+curl -X POST /api/tools/check -d '{"mode": "keyless"}'
 
-# Check all configured APIs (have keys in .env)
-curl -X POST /api/tools/check -d '{"mode": "configured"}'
-
-# Check a single API
-curl -X POST /api/tools/check -d '{"apiId": "groq"}'
-
-# Get last cached results (no live check)
-curl /api/tools/check
-```
-
-### Auto-Discovery
-```bash
-# Scan .env vars, return capability map
+# Auto-discover configured APIs
 curl -X POST /api/tools/check -d '{"mode": "discover"}'
-# → { capabilities: { web_search: ["tavily", "brave_search"], ai_completion: ["groq", "openrouter"], ... } }
-```
 
-### Find Best API for Capability
-```bash
-curl -X POST /api/tools/integrate \
-  -H 'Content-Type: application/json' \
-  -d '{"capability": "web_search"}'
-# → { api: { id: "tavily", ... }, health: { status: "ok", latencyMs: 320 }, howToCall: { ... } }
+# Find best API for a capability
+curl -X POST /api/tools/integrate -d '{"capability": "web_search"}'
 ```
-
-**Available capabilities:**
-`ai_completion`, `ai_chat`, `web_search`, `semantic_search`, `web_scraping`, `content_extraction`,
-`knowledge_lookup`, `blockchain_query`, `crypto_prices`, `code_execution`, `news_search`,
-`wallet_balance`, `weather_data`, `ip_lookup`, `qr_generation`, `embeddings`, and more.
 
 ---
 
@@ -172,39 +196,24 @@ curl -X POST /api/tools/integrate \
 OpenClaw Hub includes a built-in **agent work loop** that:
 
 1. Polls **TheColony** dispatch queue every 15 minutes (or instantly via webhook)
-2. Accepts available tasks matching agent capabilities
+2. Accepts tasks matching agent capabilities (skill IDs)
 3. Executes tasks using AI (OpenRouter/Groq) or code sandboxes (E2B)
 4. Claims EGLD bounty on completion
 5. Stores results in MongoDB (`tasks`, `loop_runs` collections)
-
-### Trigger the Loop Manually
-
-```bash
-curl -X POST https://your-domain.vercel.app/api/agents/loop \
-  -H "x-cron-secret: YOUR_CRON_SECRET"
-```
 
 ---
 
 ## 🔒 Security
 
-- All `/api/agents/*` routes are protected by middleware (except `/status` and `/webhook`)
-- Agent API keys are stored **AES-256 encrypted** in MongoDB
-- Never commit `.env.local` — it's in `.gitignore`
-- Use `openssl rand -hex 32` to generate secrets
+- All `/api/agents/*` routes protected by middleware
+- Agent API keys stored **AES-256 encrypted** in MongoDB
+- `openssl rand -hex 32` to generate secrets
 
 ---
 
 ## 🆓 Free APIs
 
-See [`FREE_APIS.md`](FREE_APIS.md) for a curated list of 50+ free APIs agents can use, including:
-- **AI/LLM**: OpenRouter, Groq, Gemini, Mistral, Cohere, Together AI
-- **Search**: Tavily, Brave, Serper, Exa, DuckDuckGo (no key)
-- **Blockchain**: MultiversX API, Blockscout, CoinGecko, DeFiLlama (all keyless)
-- **Web**: Jina Reader (no key), Firecrawl, GitHub API
-- **Data**: Wikipedia, Wikidata, Open Meteo, REST Countries (all keyless)
-
-All 30+ APIs are also live-checkable from `/tools`.
+See [`FREE_APIS.md`](FREE_APIS.md) for 50+ free APIs. All 30+ core APIs live-checkable from `/tools`.
 
 ---
 
@@ -214,7 +223,7 @@ All 30+ APIs are also live-checkable from `/tools`.
 - [ ] **Rust Smart Contract** — `registerAgent`, `postTask`, `claimTask`, `releasePayment` on MVX devnet
 - [ ] **Webhook from TheColony** — Instant dispatch (no polling)
 - [ ] **Agent Leaderboard** — Karma, tasks completed, success rate
-- [ ] **Multi-agent UI** — Create/edit/delete agents with different capabilities
+- [ ] **Multi-agent UI** — Create/edit/delete agents with different skill sets
 - [ ] **MCP Protocol** — Full Model Context Protocol server
 
 ---

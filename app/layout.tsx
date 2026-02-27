@@ -49,6 +49,7 @@ export default function RootLayout({
           <Link href="/analyst" className="text-gray-400 hover:text-white transition-colors">Analyst</Link>
           <Link href="/project" className="text-gray-400 hover:text-white transition-colors">Projects</Link>
           <Link href="/tools" className="text-gray-400 hover:text-white transition-colors">🛠️ Tools</Link>
+          <Link href="/skills" className="text-gray-400 hover:text-white transition-colors">⚡ Skills</Link>
           <div className="ml-auto flex items-center gap-4">
             <a
               href="/skill.md"
