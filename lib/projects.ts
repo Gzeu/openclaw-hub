@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import matter from 'gray-matter';
+import yaml from 'js-yaml';
 
 export interface Project {
   name: string;
@@ -36,9 +36,26 @@ export async function getAllProjects(): Promise<Project[]> {
 
     const fullPath = path.join(projectsDirectory, fileName);
     const fileContents = fs.readFileSync(fullPath, 'utf8');
-    const { data } = matter(fileContents);
+    
+    try {
+      const data = yaml.load(fileContents) as any;
 
-    projects.push(data as Project);
+      // Validate required fields
+      if (!data.name) {
+        console.warn(`Project in ${fileName} is missing required 'name' field`);
+        continue;
+      }
+
+      // Ensure tags is an array
+      if (!data.tags || !Array.isArray(data.tags)) {
+        data.tags = [];
+      }
+
+      projects.push(data as Project);
+    } catch (error) {
+      console.error(`Error parsing ${fileName}:`, error);
+      continue;
+    }
   }
 
   // Sort: pinned first, then featured, then by name
@@ -47,7 +64,11 @@ export async function getAllProjects(): Promise<Project[]> {
     if (!a.pinned && b.pinned) return 1;
     if (a.featured && !b.featured) return -1;
     if (!a.featured && b.featured) return 1;
-    return a.name.localeCompare(b.name);
+    
+    // Safe name comparison with fallback
+    const nameA = a.name || '';
+    const nameB = b.name || '';
+    return nameA.localeCompare(nameB);
   });
 }
 
@@ -58,14 +79,16 @@ export async function getProjectByName(name: string): Promise<Project | null> {
 
 export async function getProjectsByTag(tag: string): Promise<Project[]> {
   const projects = await getAllProjects();
-  return projects.filter((p) => p.tags.includes(tag));
+  return projects.filter((p) => p.tags && Array.isArray(p.tags) && p.tags.includes(tag));
 }
 
 export async function getAllTags(): Promise<string[]> {
   const projects = await getAllProjects();
   const tags = new Set<string>();
   projects.forEach((project) => {
-    project.tags.forEach((tag) => tags.add(tag));
+    if (project.tags && Array.isArray(project.tags)) {
+      project.tags.forEach((tag) => tags.add(tag));
+    }
   });
   return Array.from(tags).sort();
 }
