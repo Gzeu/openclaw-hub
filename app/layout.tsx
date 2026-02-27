@@ -21,27 +21,20 @@ export const metadata: Metadata = {
     url: 'https://openclaw-hub.vercel.app',
     siteName: 'OpenClaw Hub',
     title: 'OpenClaw Hub — Discover AI Agent Projects',
-    description:
-      'The centralized discovery and management platform for OpenClaw AI agent projects.',
+    description: 'The centralized discovery and management platform for OpenClaw AI agent projects.',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'OpenClaw Hub — Discover AI Agent Projects',
-    description:
-      'The centralized discovery and management platform for OpenClaw AI agent projects.',
+    description: 'The centralized discovery and management platform for OpenClaw AI agent projects.',
     creator: '@Gzeu',
   },
-  robots: {
-    index: true,
-    follow: true,
-  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <body className={inter.className}>
@@ -49,24 +42,13 @@ export default function RootLayout({
           <Link href="/" className="font-bold text-white text-base mr-4">
             🦅 OpenClaw Hub
           </Link>
-          <Link href="/agents" className="text-gray-400 hover:text-white transition-colors">
-            Agents
-          </Link>
-          <Link href="/economy" className="text-gray-400 hover:text-white transition-colors">
-            Economy
-          </Link>
-          <Link href="/wallet" className="text-gray-400 hover:text-white transition-colors">
-            Wallet
-          </Link>
-          <Link href="/activity" className="text-gray-400 hover:text-white transition-colors">
-            Activity
-          </Link>
-          <Link href="/analyst" className="text-gray-400 hover:text-white transition-colors">
-            Analyst
-          </Link>
-          <Link href="/project" className="text-gray-400 hover:text-white transition-colors">
-            Projects
-          </Link>
+          <Link href="/agents" className="text-gray-400 hover:text-white transition-colors">Agents</Link>
+          <Link href="/economy" className="text-gray-400 hover:text-white transition-colors">Economy</Link>
+          <Link href="/wallet" className="text-gray-400 hover:text-white transition-colors">Wallet</Link>
+          <Link href="/activity" className="text-gray-400 hover:text-white transition-colors">Activity</Link>
+          <Link href="/analyst" className="text-gray-400 hover:text-white transition-colors">Analyst</Link>
+          <Link href="/project" className="text-gray-400 hover:text-white transition-colors">Projects</Link>
+          <Link href="/tools" className="text-gray-400 hover:text-white transition-colors">🛠️ Tools</Link>
           <div className="ml-auto flex items-center gap-4">
             <a
               href="/skill.md"

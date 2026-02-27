@@ -24,6 +24,9 @@
 | API Key Encryption | ✅ | AES-256 encrypted API keys in MongoDB |
 | API Auth Middleware | ✅ | `x-cron-secret` / `x-api-key` protection |
 | `skill.md` | ✅ | Agent discovery file at `/skill.md` |
+| **API Health Checker** | ✅ | Live health check for 30+ free APIs |
+| **Auto-Discovery** | ✅ | Scan env vars, build capability map |
+| **API Integration** | ✅ | Find best API for any capability at `/tools` |
 | Smart Contract (MVX) | 🔜 | Rust SC for EGLD payments on devnet |
 | NextAuth.js Login | 🔜 | User auth + MVX wallet linking |
 | Webhook from TheColony | 🔜 | Instant dispatch (vs 15-min polling) |
@@ -90,16 +93,22 @@ openclaw-hub/
 │   ├── activity/           # Activity log
 │   ├── analyst/            # AI analyst
 │   ├── project/            # Project detail pages
+│   ├── tools/              # API Health Dashboard (NEW)
 │   └── api/
 │       ├── agents/         # Agent CRUD + loop endpoints
 │       ├── analyst/        # AI analysis endpoint
 │       ├── cron/           # Cron job triggers
 │       ├── sandbox/        # E2B code execution
 │       ├── wallet/         # MVX wallet queries
-│       └── mcp/            # MCP tool endpoints
+│       ├── mcp/            # MCP tool endpoints
+│       └── tools/          # API checker & integration endpoints (NEW)
+│           ├── check/      # GET (cached) / POST (live check)
+│           └── integrate/  # POST — find best API for capability
 ├── lib/
 │   ├── db.ts               # MongoDB connection singleton
 │   ├── db-agents.ts        # Agent/Task/LoopRun repository
+│   ├── api-registry.ts     # Catalog of 30+ free APIs (NEW)
+│   ├── api-checker.ts      # Health check engine + auto-discovery (NEW)
 │   ├── models/             # TypeScript models (Agent, Task, LoopRun, User)
 │   ├── agent-economy.ts    # TheColony + OpenTask integration
 │   ├── multiversx.ts       # MVX blockchain client
@@ -109,10 +118,52 @@ openclaw-hub/
 ├── data/                   # Static YAML project data
 ├── public/
 │   └── skill.md            # Agent discovery file
-├── middleware.ts           # API route protection
-├── FREE_APIS.md            # Free API list for agents
-└── .env.example            # Environment variable template
+├── middleware.ts            # API route protection
+├── FREE_APIS.md             # Free API reference list
+└── .env.example             # Environment variable template
 ```
+
+---
+
+## 🛠️ API Tools System
+
+OpenClaw Hub includes a built-in **API health checker and integration engine** at `/tools`.
+
+### Health Check
+```bash
+# Check all keyless APIs (no config needed)
+curl -X POST /api/tools/check -H 'Content-Type: application/json' \
+  -d '{"mode": "keyless"}'
+
+# Check all configured APIs (have keys in .env)
+curl -X POST /api/tools/check -d '{"mode": "configured"}'
+
+# Check a single API
+curl -X POST /api/tools/check -d '{"apiId": "groq"}'
+
+# Get last cached results (no live check)
+curl /api/tools/check
+```
+
+### Auto-Discovery
+```bash
+# Scan .env vars, return capability map
+curl -X POST /api/tools/check -d '{"mode": "discover"}'
+# → { capabilities: { web_search: ["tavily", "brave_search"], ai_completion: ["groq", "openrouter"], ... } }
+```
+
+### Find Best API for Capability
+```bash
+curl -X POST /api/tools/integrate \
+  -H 'Content-Type: application/json' \
+  -d '{"capability": "web_search"}'
+# → { api: { id: "tavily", ... }, health: { status: "ok", latencyMs: 320 }, howToCall: { ... } }
+```
+
+**Available capabilities:**
+`ai_completion`, `ai_chat`, `web_search`, `semantic_search`, `web_scraping`, `content_extraction`,
+`knowledge_lookup`, `blockchain_query`, `crypto_prices`, `code_execution`, `news_search`,
+`wallet_balance`, `weather_data`, `ip_lookup`, `qr_generation`, `embeddings`, and more.
 
 ---
 
@@ -133,13 +184,6 @@ curl -X POST https://your-domain.vercel.app/api/agents/loop \
   -H "x-cron-secret: YOUR_CRON_SECRET"
 ```
 
-### Agent Discovery
-
-Other platforms discover this agent via:
-```
-GET /skill.md
-```
-
 ---
 
 ## 🔒 Security
@@ -153,11 +197,14 @@ GET /skill.md
 
 ## 🆓 Free APIs
 
-See [`FREE_APIS.md`](FREE_APIS.md) for a curated list of free APIs agents can use, including:
-- AI/LLM: OpenRouter, Groq, Gemini, Mistral
-- Search: Tavily, Brave, Serper, Exa
-- Blockchain: MultiversX API, Blockscout, CoinGecko
-- Web: Jina Reader, Firecrawl, GitHub API
+See [`FREE_APIS.md`](FREE_APIS.md) for a curated list of 50+ free APIs agents can use, including:
+- **AI/LLM**: OpenRouter, Groq, Gemini, Mistral, Cohere, Together AI
+- **Search**: Tavily, Brave, Serper, Exa, DuckDuckGo (no key)
+- **Blockchain**: MultiversX API, Blockscout, CoinGecko, DeFiLlama (all keyless)
+- **Web**: Jina Reader (no key), Firecrawl, GitHub API
+- **Data**: Wikipedia, Wikidata, Open Meteo, REST Countries (all keyless)
+
+All 30+ APIs are also live-checkable from `/tools`.
 
 ---
 
