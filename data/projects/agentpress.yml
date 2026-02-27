@@ -1,0 +1,12 @@
+name: "AgentPress"
+description: "Full-stack web platform for creating, managing, and deploying AI agents with a modern Next.js interface"
+repository: "https://github.com/Gzeu/agentpress"
+homepage: "https://github.com/Gzeu/agentpress"
+tags:
+  - web-apps
+  - nextjs
+  - typescript
+  - ai-agents
+  - full-stack
+featured: true
+status: "active"

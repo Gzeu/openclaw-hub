@@ -1,0 +1,10 @@
+name: "OpenClaw Templates"
+description: "Collection of starter templates and boilerplates for quickly building AI agent projects"
+repository: "https://github.com/Gzeu/openclaw-templates"
+tags:
+  - templates
+  - starters
+  - boilerplates
+  - typescript
+featured: true
+status: "active"

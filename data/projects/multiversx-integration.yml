@@ -1,0 +1,10 @@
+name: "MultiversX Integration"
+description: "Blockchain integration tools for connecting AI agents with MultiversX smart contracts and DeFi protocols"
+repository: "https://github.com/Gzeu/openclaw-multiversx"
+tags:
+  - blockchain
+  - web3
+  - multiversx
+  - defi
+  - integration
+status: "beta"

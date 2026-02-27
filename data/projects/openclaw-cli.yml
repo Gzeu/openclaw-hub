@@ -1,0 +1,9 @@
+name: "OpenClaw CLI"
+description: "Command-line interface tools for managing OpenClaw projects and agent workflows"
+repository: "https://github.com/Gzeu/openclaw-cli"
+tags:
+  - cli-tools
+  - typescript
+  - automation
+  - developer-tools
+status: "active"

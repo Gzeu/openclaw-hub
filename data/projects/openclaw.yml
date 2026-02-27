@@ -1,0 +1,14 @@
+name: "OpenClaw"
+description: "Core AI agent framework for building intelligent automation systems with advanced orchestration capabilities"
+repository: "https://github.com/Gzeu/openclaw"
+homepage: "https://github.com/Gzeu/openclaw"
+tags:
+  - ai-agents
+  - automation
+  - orchestration
+  - typescript
+  - framework
+featured: true
+pinned: true
+status: "active"
+version: "1.0.0"
