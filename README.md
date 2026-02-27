@@ -1,152 +1,191 @@
-# 🎮 OpenClaw Hub
+# 🦅 OpenClaw Hub
 
-**The centralized discovery and management platform for OpenClaw AI agent projects**
+> The centralized discovery, management, and agent economy platform for the OpenClaw AI ecosystem — powered by **Next.js 15**, **MongoDB**, and **MultiversX**.
 
-OpenClaw Hub is your gateway to exploring, managing, and deploying projects built with the OpenClaw AI agent framework. Discover featured projects, browse by tags, and get started with the OpenClaw ecosystem.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green)](https://cloud.mongodb.com)
+
+---
 
 ## ✨ Features
 
-- **📦 Project Discovery** - Browse all OpenClaw projects in one place
-- **⭐ Featured Projects** - Highlighted showcase of exemplary implementations
-- **📌 Pinned Projects** - Quick access to priority projects
-- **🏷️ Tag-based Filtering** - Find projects by technology, category, or use case
-- **🔍 Search** - Quick project search by name or description
-- **🎨 Modern UI** - Clean, responsive design with dark mode
-- **📊 Project Cards** - Rich metadata display with links and stats
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Project Discovery | ✅ | Browse & search OpenClaw projects |
+| Agent Management | ✅ | Multi-agent CRUD with capability profiles |
+| Agent Economy Loop | ✅ | Polling + webhook trigger from TheColony/OpenTask |
+| Economy Dashboard `/economy` | ✅ | Earnings, task history, EGLD stats |
+| Wallet Dashboard `/wallet` | ✅ | MVX wallet balance & transactions |
+| Activity Log `/activity` | ✅ | Real-time agent activity feed |
+| AI Analyst `/analyst` | ✅ | AI-powered code & project analysis |
+| MongoDB Persistence | ✅ | Agents, tasks, loop runs stored in DB |
+| API Key Encryption | ✅ | AES-256 encrypted API keys in MongoDB |
+| API Auth Middleware | ✅ | `x-cron-secret` / `x-api-key` protection |
+| `skill.md` | ✅ | Agent discovery file at `/skill.md` |
+| Smart Contract (MVX) | 🔜 | Rust SC for EGLD payments on devnet |
+| NextAuth.js Login | 🔜 | User auth + MVX wallet linking |
+| Webhook from TheColony | 🔜 | Instant dispatch (vs 15-min polling) |
 
-## 🚀 Quick Start
+---
+
+## 🏗️ Tech Stack
+
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript 5
+- **Styling**: Tailwind CSS 3
+- **Database**: MongoDB Atlas (free M0 tier) via native `mongodb` driver
+- **Blockchain**: MultiversX (devnet/mainnet)
+- **AI**: OpenRouter (Claude, GPT-4, Gemini, Mistral), Groq, Gemini
+- **Code Execution**: E2B Sandboxes
+- **Deployment**: Vercel
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- A [MongoDB Atlas](https://cloud.mongodb.com) free account (M0 cluster)
+- An [OpenRouter](https://openrouter.ai) API key (free $5 credits)
+
+### Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/Gzeu/openclaw-hub.git
 cd openclaw-hub
-
-# Install dependencies
 npm install
-
-# Run development server
+cp .env.example .env.local
+# → Fill in MONGODB_URI and other required vars
 npm run dev
-
-# Build for production
-npm run build
-npm start
 ```
 
-Visit `http://localhost:3000` to see the hub in action.
+Open [http://localhost:3000](http://localhost:3000).
+
+### Environment Variables
+
+See [`.env.example`](.env.example) for all variables with descriptions and links to get free API keys.
+
+**Minimum required to run:**
+```env
+MONGODB_URI=mongodb+srv://...
+ENCRYPTION_KEY=your-32-char-secret
+CRON_SECRET=any-random-string
+```
+
+---
 
 ## 📁 Project Structure
 
 ```
 openclaw-hub/
-├── app/                    # Next.js App Router
-│   ├── page.tsx           # Main hub page
-│   ├── layout.tsx         # Root layout
-│   └── globals.css        # Global styles
-├── components/            # React components
-│   ├── ProjectCard.tsx   # Project card component
-│   ├── FilterBar.tsx     # Tag filtering
-│   └── SearchBar.tsx     # Search functionality
+├── app/
+│   ├── layout.tsx          # Root layout with navigation
+│   ├── page.tsx            # Home — project discovery
+│   ├── agents/             # Agent management UI
+│   ├── economy/            # Economy dashboard (earnings, tasks)
+│   ├── wallet/             # MVX wallet dashboard
+│   ├── activity/           # Activity log
+│   ├── analyst/            # AI analyst
+│   ├── project/            # Project detail pages
+│   └── api/
+│       ├── agents/         # Agent CRUD + loop endpoints
+│       ├── analyst/        # AI analysis endpoint
+│       ├── cron/           # Cron job triggers
+│       ├── sandbox/        # E2B code execution
+│       ├── wallet/         # MVX wallet queries
+│       └── mcp/            # MCP tool endpoints
 ├── lib/
-│   └── projects.ts       # Project loading utilities
-├── data/
-│   └── projects/         # Project YAML files
-│       ├── openclaw.yml
-│       ├── agentpress.yml
-│       └── ...
-└── public/               # Static assets
+│   ├── db.ts               # MongoDB connection singleton
+│   ├── db-agents.ts        # Agent/Task/LoopRun repository
+│   ├── models/             # TypeScript models (Agent, Task, LoopRun, User)
+│   ├── agent-economy.ts    # TheColony + OpenTask integration
+│   ├── multiversx.ts       # MVX blockchain client
+│   ├── ai-analyst.ts       # OpenRouter AI integration
+│   └── e2b.ts              # E2B sandbox client
+├── components/             # Reusable UI components
+├── data/                   # Static YAML project data
+├── public/
+│   └── skill.md            # Agent discovery file
+├── middleware.ts           # API route protection
+├── FREE_APIS.md            # Free API list for agents
+└── .env.example            # Environment variable template
 ```
-
-## 📝 Adding Projects
-
-Add new projects by creating YAML files in `data/projects/`:
-
-```yaml
-name: "My OpenClaw Project"
-description: "Short project description"
-repository: "https://github.com/username/project"
-tags:
-  - ai-agents
-  - automation
-featured: false
-pinned: false
-status: "active"
-```
-
-### Available Fields
-
-- **name** (required) - Project name
-- **description** (required) - Brief description
-- **repository** (required) - GitHub repository URL
-- **tags** (required) - Array of technology/category tags
-- **homepage** (optional) - Live demo or documentation URL
-- **npm** (optional) - NPM package URL
-- **featured** (optional) - Show in featured section
-- **pinned** (optional) - Pin to top of list
-- **status** (optional) - `active`, `beta`, `archived`
-- **version** (optional) - Current version
-- **stars** (optional) - GitHub stars count
-- **downloads** (optional) - NPM downloads
-
-## 🏷️ Common Tags
-
-- **Framework**: `ai-agents`, `automation`, `orchestration`
-- **Technology**: `typescript`, `python`, `react`, `nextjs`
-- **Category**: `web-apps`, `cli-tools`, `libraries`, `templates`
-- **Use Case**: `content`, `data-analysis`, `blockchain`, `gaming`
-- **Status**: `stable`, `beta`, `experimental`
-
-## 🛠️ Tech Stack
-
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Icons**: Lucide React
-- **Data**: YAML with gray-matter parsing
-- **Deployment**: Vercel-ready
-
-## 🤝 Contributing
-
-Contributions are welcome! To add your OpenClaw project:
-
-1. Fork this repository
-2. Add your project YAML file to `data/projects/`
-3. Submit a pull request
-
-Ensure your project:
-- Uses OpenClaw framework or integrates with the ecosystem
-- Has clear documentation
-- Follows the YAML structure above
-
-## 📚 OpenClaw Ecosystem
-
-- [OpenClaw](https://github.com/Gzeu/openclaw) - Core AI agent framework
-- [AgentPress](https://github.com/Gzeu/agentpress) - Web platform for AI agents
-- [OpenClaw CLI](https://github.com/Gzeu/openclaw-cli) - Command-line tools
-- [OpenClaw Templates](https://github.com/Gzeu/openclaw-templates) - Project starters
-
-## 🚀 Deployment
-
-### Deploy to Vercel
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Gzeu/openclaw-hub)
-
-### Manual Deployment
-
-```bash
-npm run build
-npm start
-```
-
-## 📄 License
-
-MIT License - see LICENSE file for details
-
-## 🔗 Links
-
-- **Repository**: [github.com/Gzeu/openclaw-hub](https://github.com/Gzeu/openclaw-hub)
-- **Issues**: [Report a bug](https://github.com/Gzeu/openclaw-hub/issues)
-- **Discussions**: [Join the community](https://github.com/Gzeu/openclaw-hub/discussions)
 
 ---
 
-**Built with ❤️ for the OpenClaw community**
+## 🤖 Agent Economy
+
+OpenClaw Hub includes a built-in **agent work loop** that:
+
+1. Polls **TheColony** dispatch queue every 15 minutes (or instantly via webhook)
+2. Accepts available tasks matching agent capabilities
+3. Executes tasks using AI (OpenRouter/Groq) or code sandboxes (E2B)
+4. Claims EGLD bounty on completion
+5. Stores results in MongoDB (`tasks`, `loop_runs` collections)
+
+### Trigger the Loop Manually
+
+```bash
+curl -X POST https://your-domain.vercel.app/api/agents/loop \
+  -H "x-cron-secret: YOUR_CRON_SECRET"
+```
+
+### Agent Discovery
+
+Other platforms discover this agent via:
+```
+GET /skill.md
+```
+
+---
+
+## 🔒 Security
+
+- All `/api/agents/*` routes are protected by middleware (except `/status` and `/webhook`)
+- Agent API keys are stored **AES-256 encrypted** in MongoDB
+- Never commit `.env.local` — it's in `.gitignore`
+- Use `openssl rand -hex 32` to generate secrets
+
+---
+
+## 🆓 Free APIs
+
+See [`FREE_APIS.md`](FREE_APIS.md) for a curated list of free APIs agents can use, including:
+- AI/LLM: OpenRouter, Groq, Gemini, Mistral
+- Search: Tavily, Brave, Serper, Exa
+- Blockchain: MultiversX API, Blockscout, CoinGecko
+- Web: Jina Reader, Firecrawl, GitHub API
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] **NextAuth.js** — User login + MVX wallet linking
+- [ ] **Rust Smart Contract** — `registerAgent`, `postTask`, `claimTask`, `releasePayment` on MVX devnet
+- [ ] **Webhook from TheColony** — Instant dispatch (no polling)
+- [ ] **Agent Leaderboard** — Karma, tasks completed, success rate
+- [ ] **Multi-agent UI** — Create/edit/delete agents with different capabilities
+- [ ] **MCP Protocol** — Full Model Context Protocol server
+
+---
+
+## 🌐 Related Projects
+
+| Project | Description |
+|---------|-------------|
+| [ClawNet](https://github.com/Gzeu/clawnet) | Agent mesh network for context handoff |
+| [ClawTree](https://github.com/Gzeu/clawtree) | Talent tree + skill knowledge graph |
+| [Pangolin Security Claw](https://github.com/Gzeu/pangolin-security-claw) | Local security dashboard |
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE)
+
+---
+
+*Built with ❤️ by [George Pricop](https://github.com/Gzeu) — last updated February 2026*
