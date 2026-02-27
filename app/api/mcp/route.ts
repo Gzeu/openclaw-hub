@@ -1,100 +1,232 @@
-// MCP Bridge — OpenClaw ACP <-> E2B Sandbox
-// Exposes E2B sandbox capabilities as MCP tools
-// Compatible with e2b-dev/mcp-server protocol
 import { NextRequest, NextResponse } from 'next/server'
-import { runInSandbox } from '@/lib/e2b'
-import { addActivity } from '@/lib/activity-log'
 
-export const runtime = 'nodejs'
-export const maxDuration = 60
+export const dynamic = 'force-dynamic'
 
-// MCP tool manifest — returned to any MCP client (OpenClaw, Claude, etc.)
-const MCP_TOOLS = [
-  {
-    name: 'e2b_run_code',
-    description: 'Run Python or JavaScript code in a secure E2B sandbox and get stdout/stderr back.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        code: { type: 'string', description: 'Code to execute' },
-        language: { type: 'string', enum: ['python', 'javascript'], default: 'python' },
-      },
-      required: ['code'],
-    },
-  },
-  {
-    name: 'e2b_analyze_data',
-    description: 'Analyze CSV data using pandas in E2B sandbox. Pass raw CSV as string.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        csv: { type: 'string', description: 'Raw CSV content' },
-        question: { type: 'string', description: 'What to analyze' },
-      },
-      required: ['csv', 'question'],
-    },
-  },
-]
-
-export async function GET() {
-  // MCP discovery endpoint
-  return NextResponse.json({
-    name: 'openclaw-hub-e2b',
-    version: '1.0.0',
-    description: 'E2B sandbox tools for OpenClaw agents via MCP',
-    tools: MCP_TOOLS,
-  })
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+type JsonRpcReq = {
+  jsonrpc: '2.0'
+  id: string | number | null
+  method: string
+  params?: any
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const { tool, input, agentId } = body
+type JsonRpcRes = {
+  jsonrpc: '2.0'
+  id: string | number | null
+  result?: any
+  error?: { code: number; message: string; data?: any }
+}
 
-    if (!process.env.E2B_API_KEY) {
-      return NextResponse.json({ error: 'E2B_API_KEY not configured' }, { status: 500 })
-    }
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+const BASE_HEADERS = {
+  'Content-Type': 'application/json',
+  'X-Content-Type-Options': 'nosniff',
+  'Access-Control-Allow-Origin': '*',
+}
 
-    const start = Date.now()
+/**
+ * Tool definitions — MCP Tools spec (inputSchema is JSON Schema).
+ * https://modelcontextprotocol.info/specification/2024-11-05/server/tools/
+ */
+const TOOLS = [
+  {
+    name: 'openclaw.skills.list',
+    description: 'List all skills exposed by OpenClaw Hub (GET /api/skills).',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'openclaw.skills.match',
+    description:
+      'Match a natural-language task description to the most relevant OpenClaw Hub skills (POST /api/skills).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', description: 'Natural-language description of what you want to do.' },
+      },
+      required: ['task'],
+      additionalProperties: false,
+    },
+  },
+] as const
 
-    if (tool === 'e2b_run_code') {
-      const result = await runInSandbox(input.code, input.language ?? 'python')
-      addActivity({
-        type: 'mcp_call',
-        agentId,
-        summary: `MCP e2b_run_code (${input.language ?? 'python'}) — ${result.executionTime}ms`,
-        durationMs: Date.now() - start,
-        status: result.error ? 'error' : 'success',
-        meta: { sandboxId: result.sandboxId },
-      })
-      return NextResponse.json({ result })
-    }
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function ok(id: JsonRpcRes['id'], result: any): JsonRpcRes {
+  return { jsonrpc: '2.0', id, result }
+}
 
-    if (tool === 'e2b_analyze_data') {
-      const code = `
-import pandas as pd
-import io
-csv_data = """${input.csv.replace(/"/g, '"""')}"""
-df = pd.read_csv(io.StringIO(csv_data))
-print(df.describe().to_string())
-print()
-print('Question: ${input.question}')
-print('Shape:', df.shape)
-print('Columns:', list(df.columns))
-`
-      const result = await runInSandbox(code, 'python')
-      addActivity({
-        type: 'mcp_call',
-        agentId,
-        summary: `MCP e2b_analyze_data — ${input.question?.slice(0, 50)}`,
-        durationMs: Date.now() - start,
-        status: result.error ? 'error' : 'success',
-      })
-      return NextResponse.json({ result })
-    }
+function rpcErr(id: JsonRpcRes['id'], code: number, message: string, data?: any): JsonRpcRes {
+  return { jsonrpc: '2.0', id, error: { code, message, ...(data !== undefined ? { data } : {}) } }
+}
 
-    return NextResponse.json({ error: `Unknown tool: ${tool}` }, { status: 400 })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+/** Optional API key guard — only active when MCP_API_KEY env var is set. */
+function checkApiKey(req: NextRequest, id: JsonRpcRes['id']): NextResponse | null {
+  const key = process.env.MCP_API_KEY?.trim()
+  if (!key) return null                                 // not configured → open access
+  const provided = req.headers.get('x-mcp-api-key') ?? ''
+  if (provided !== key) {
+    return NextResponse.json(
+      rpcErr(id, 401, 'Unauthorized', { message: 'Missing or invalid x-mcp-api-key header.' }),
+      { status: 401, headers: BASE_HEADERS }
+    )
   }
+  return null
+}
+
+async function proxyJson(origin: string, path: string, init?: RequestInit) {
+  const res = await fetch(origin + path, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    cache: 'no-store',
+  })
+  const text = await res.text()
+  let json: any
+  try { json = JSON.parse(text) } catch { json = { raw: text } }
+  return { status: res.status, json }
+}
+
+// ---------------------------------------------------------------------------
+// Route handlers
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/mcp — human-readable hint
+ */
+export async function GET() {
+  return NextResponse.json(
+    { hint: 'POST JSON-RPC 2.0. Methods: initialize | tools/list | tools/call' },
+    { headers: BASE_HEADERS }
+  )
+}
+
+/**
+ * POST /api/mcp — MCP JSON-RPC 2.0 endpoint
+ *
+ * Supported methods:
+ *   initialize        — handshake + capability negotiation
+ *   tools/list        — return all available tools with inputSchema
+ *   tools/call        — invoke a tool by name with arguments
+ *
+ * Ref: https://modelcontextprotocol.info/specification/2024-11-05/server/tools/
+ */
+export async function POST(req: NextRequest) {
+  // Parse body first so we can echo the id in error responses
+  let body: JsonRpcReq
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json(rpcErr(null, -32700, 'Parse error'), { status: 400, headers: BASE_HEADERS })
+  }
+
+  const id = body?.id ?? null
+
+  // Basic JSON-RPC validation
+  if (!body || body.jsonrpc !== '2.0' || typeof body.method !== 'string') {
+    return NextResponse.json(rpcErr(id, -32600, 'Invalid Request'), { status: 400, headers: BASE_HEADERS })
+  }
+
+  // Auth guard (noop if MCP_API_KEY not set)
+  const authErr = checkApiKey(req, id)
+  if (authErr) return authErr
+
+  const origin = new URL(req.url).origin
+
+  // -------------------------------------------------------------------------
+  // Method dispatch
+  // -------------------------------------------------------------------------
+
+  // initialize — capability handshake
+  if (body.method === 'initialize') {
+    return NextResponse.json(
+      ok(id, {
+        protocolVersion: '2025-11-25',
+        serverInfo: { name: 'openclaw-hub', version: '0.2.0' },
+        capabilities: { tools: { listChanged: false } },
+      }),
+      { headers: BASE_HEADERS }
+    )
+  }
+
+  // tools/list — enumerate all tools
+  if (body.method === 'tools/list') {
+    return NextResponse.json(ok(id, { tools: TOOLS }), { headers: BASE_HEADERS })
+  }
+
+  // tools/call — invoke a tool
+  if (body.method === 'tools/call') {
+    const name = body.params?.name
+    const args = body.params?.arguments ?? {}
+
+    // openclaw.skills.list
+    if (name === 'openclaw.skills.list') {
+      const { status, json } = await proxyJson(origin, '/api/skills')
+      if (status >= 400) {
+        return NextResponse.json(
+          rpcErr(id, -32000, 'Upstream /api/skills failed', { status, body: json }),
+          { headers: BASE_HEADERS }
+        )
+      }
+      return NextResponse.json(
+        ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }),
+        { headers: BASE_HEADERS }
+      )
+    }
+
+    // openclaw.skills.match
+    if (name === 'openclaw.skills.match') {
+      if (typeof args.task !== 'string' || !args.task.trim()) {
+        return NextResponse.json(
+          rpcErr(id, -32602, 'Invalid params: task (string) is required'),
+          { headers: BASE_HEADERS }
+        )
+      }
+      const { status, json } = await proxyJson(origin, '/api/skills', {
+        method: 'POST',
+        body: JSON.stringify({ task: args.task }),
+      })
+      if (status >= 400) {
+        return NextResponse.json(
+          rpcErr(id, -32000, 'Upstream POST /api/skills failed', { status, body: json }),
+          { headers: BASE_HEADERS }
+        )
+      }
+      return NextResponse.json(
+        ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }),
+        { headers: BASE_HEADERS }
+      )
+    }
+
+    return NextResponse.json(
+      rpcErr(id, -32601, `Unknown tool: ${String(name)}`),
+      { status: 404, headers: BASE_HEADERS }
+    )
+  }
+
+  return NextResponse.json(
+    rpcErr(id, -32601, `Method not found: ${body.method}`),
+    { status: 404, headers: BASE_HEADERS }
+  )
+}
+
+/**
+ * OPTIONS /api/mcp — CORS preflight
+ */
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      ...BASE_HEADERS,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, Mcp-Session-Id, x-mcp-api-key',
+    },
+  })
 }
