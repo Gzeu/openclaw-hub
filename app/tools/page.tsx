@@ -1,206 +1,160 @@
-/**
- * /tools — API Health Dashboard
- * Shows status of all registered APIs, supports live re-check.
- */
 'use client';
 
 import { useState, useEffect } from 'react';
 
 interface ApiResult {
-  apiId: string;
-  apiName: string;
-  category: string;
+  apiId: string; apiName: string; category: string;
   status: 'ok' | 'degraded' | 'error' | 'unconfigured' | 'unknown';
-  statusCode?: number;
-  latencyMs?: number;
-  error?: string;
-  keyConfigured: boolean;
-  keyless: boolean;
-  provides: string[];
-  checkedAt?: string;
+  statusCode?: number; latencyMs?: number; error?: string;
+  keyConfigured: boolean; keyless: boolean;
+  provides: string[]; checkedAt?: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  ok: 'bg-green-500/20 text-green-400 border-green-800',
-  degraded: 'bg-yellow-500/20 text-yellow-400 border-yellow-800',
-  error: 'bg-red-500/20 text-red-400 border-red-800',
-  unconfigured: 'bg-gray-500/20 text-gray-500 border-gray-800',
-  unknown: 'bg-gray-500/20 text-gray-500 border-gray-800',
-};
-
-const STATUS_ICONS: Record<string, string> = {
-  ok: '✅',
-  degraded: '⚠️',
-  error: '❌',
-  unconfigured: '⬜',
-  unknown: '❓',
+const STATUS_META: Record<string, { icon: string; badge: string; label: string }> = {
+  ok:           { icon: '✅', badge: 'badge badge-green',  label: 'OK'           },
+  degraded:     { icon: '⚠️', badge: 'badge badge-amber',  label: 'Degraded'     },
+  error:        { icon: '❌', badge: 'badge badge-red',    label: 'Error'        },
+  unconfigured: { icon: '⬜', badge: 'badge',              label: 'Unconfigured' },
+  unknown:      { icon: '❓', badge: 'badge',              label: 'Unknown'      },
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  ai_llm: '🤖 AI / LLM',
-  search: '🔍 Search',
-  scraping: '🌐 Scraping',
-  data: '📊 Data',
-  blockchain: '🔗 Blockchain',
-  code: '💻 Code',
-  storage: '📁 Storage',
-  utility: '🛠️ Utility',
-  agent_economy: '💰 Agent Economy',
+  ai_llm:       '🤖 AI / LLM',
+  search:       '🔍 Search',
+  scraping:     '🌐 Scraping',
+  data:         '📊 Data',
+  blockchain:   '🔗 Blockchain',
+  code:         '💻 Code',
+  storage:      '📁 Storage',
+  utility:      '🛠️ Utility',
+  agent_economy: '💰 Economy',
 };
 
 export default function ToolsPage() {
-  const [results, setResults] = useState<ApiResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'keyless' | 'configured' | 'all'>('keyless');
-  const [discovery, setDiscovery] = useState<Record<string, string[]> | null>(null);
-  const [filter, setFilter] = useState<string>('all');
-  const [capability, setCapability] = useState('');
+  const [results,         setResults]         = useState<ApiResult[]>([]);
+  const [loading,         setLoading]         = useState(false);
+  const [mode,            setMode]            = useState<'keyless'|'configured'|'all'>('keyless');
+  const [discovery,       setDiscovery]       = useState<Record<string, string[]> | null>(null);
+  const [filter,          setFilter]          = useState('all');
+  const [capability,      setCapability]      = useState('');
   const [integrateResult, setIntegrateResult] = useState<object | null>(null);
 
-  useEffect(() => {
-    loadStored();
-  }, []);
+  useEffect(() => { loadStored(); }, []);
 
   async function loadStored() {
-    try {
-      const res = await fetch('/api/tools/check');
-      const data = await res.json();
-      if (data.results) setResults(data.results);
-    } catch {}
+    try { const d = await fetch('/api/tools/check').then(r => r.json()); if (d.results) setResults(d.results); } catch {}
   }
-
   async function runCheck() {
     setLoading(true);
     try {
-      const res = await fetch('/api/tools/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
-      });
-      const data = await res.json();
-      if (data.summary?.results) setResults(data.summary.results);
-    } finally {
-      setLoading(false);
-    }
+      const d = await fetch('/api/tools/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) }).then(r => r.json());
+      if (d.summary?.results) setResults(d.summary.results);
+    } finally { setLoading(false); }
   }
-
   async function runDiscover() {
     setLoading(true);
     try {
-      const res = await fetch('/api/tools/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'discover' }),
-      });
-      const data = await res.json();
-      setDiscovery(data.capabilities ?? {});
-    } finally {
-      setLoading(false);
-    }
+      const d = await fetch('/api/tools/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'discover' }) }).then(r => r.json());
+      setDiscovery(d.capabilities ?? {});
+    } finally { setLoading(false); }
   }
-
   async function findIntegration() {
     if (!capability.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/tools/integrate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ capability: capability.trim() }),
-      });
-      const data = await res.json();
-      setIntegrateResult(data);
-    } finally {
-      setLoading(false);
-    }
+      const d = await fetch('/api/tools/integrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capability: capability.trim() }) }).then(r => r.json());
+      setIntegrateResult(d);
+    } finally { setLoading(false); }
   }
 
-  const categories = ['all', ...new Set(results.map((r) => r.category))];
-  const filtered = filter === 'all' ? results : results.filter((r) => r.category === filter);
-
-  const stats = {
-    ok: results.filter((r) => r.status === 'ok').length,
-    degraded: results.filter((r) => r.status === 'degraded').length,
-    error: results.filter((r) => r.status === 'error').length,
-    unconfigured: results.filter((r) => r.status === 'unconfigured').length,
+  const categories = ['all', ...new Set(results.map(r => r.category))];
+  const filtered   = filter === 'all' ? results : results.filter(r => r.category === filter);
+  const stats      = {
+    ok:           results.filter(r => r.status === 'ok').length,
+    degraded:     results.filter(r => r.status === 'degraded').length,
+    error:        results.filter(r => r.status === 'error').length,
+    unconfigured: results.filter(r => r.status === 'unconfigured').length,
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold mb-1">🛠️ API Tools Dashboard</h1>
-        <p className="text-gray-400 text-sm mb-6">
-          Health check, auto-discover, and integrate free APIs for OpenClaw agents.
-        </p>
+    <div className="min-h-screen">
+      <div className="max-w-[1100px] mx-auto px-6 py-10">
+
+        {/* Header */}
+        <div className="mb-8 animate-fade-up">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-3xl">🛠️</span>
+            <h1 className="text-3xl font-black text-white">API Tools</h1>
+            {results.length > 0 && <span className="badge badge-accent">{results.length} APIs</span>}
+          </div>
+          <p style={{ color: 'var(--text-muted)' }} className="text-sm">
+            Health check, auto-discover, and integrate 75+ free APIs for OpenClaw agents.
+          </p>
+        </div>
 
         {/* Stats */}
         {results.length > 0 && (
-          <div className="grid grid-cols-4 gap-3 mb-6">
-            {Object.entries(stats).map(([key, count]) => (
-              <div key={key} className="bg-gray-900 rounded-lg p-3 border border-gray-800">
-                <div className="text-2xl font-bold">{count}</div>
-                <div className="text-xs text-gray-500 capitalize">{key}</div>
+          <div className="grid grid-cols-4 gap-3 mb-6 animate-fade-up" style={{ animationDelay: '0.06s' }}>
+            {([
+              { key: 'ok',           label: 'Online',       color: 'var(--green)', bg: 'var(--green-soft)' },
+              { key: 'degraded',     label: 'Degraded',     color: 'var(--amber)', bg: 'rgba(245,158,11,.1)' },
+              { key: 'error',        label: 'Error',        color: 'var(--red)',   bg: 'rgba(244,63,94,.1)' },
+              { key: 'unconfigured', label: 'No Key',       color: 'var(--text-muted)', bg: 'var(--bg-hover)' },
+            ] as const).map(({ key, label, color, bg }) => (
+              <div key={key} className="card p-4 text-center" style={{ background: bg, borderColor: color + '30' }}>
+                <div className="text-2xl font-black" style={{ color }}>{stats[key]}</div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{label}</div>
               </div>
             ))}
           </div>
         )}
 
         {/* Controls */}
-        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800 mb-6">
-          <div className="flex flex-wrap gap-3 items-end">
+        <div className="card p-5 mb-6 animate-fade-up" style={{ animationDelay: '0.1s' }}>
+          <div className="flex flex-wrap gap-3 items-end mb-4">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Check Mode</label>
+              <p className="section-label mb-1.5">Check Mode</p>
               <select
                 value={mode}
-                onChange={(e) => setMode(e.target.value as typeof mode)}
-                className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm"
+                onChange={e => setMode(e.target.value as typeof mode)}
+                className="input" style={{ width: 'auto' }}
               >
                 <option value="keyless">Keyless only (no API key needed)</option>
-                <option value="configured">Configured (have keys in .env)</option>
+                <option value="configured">Configured (keys in .env)</option>
                 <option value="all">All APIs</option>
               </select>
             </div>
-            <button
-              onClick={runCheck}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-1.5 rounded text-sm font-medium"
-            >
-              {loading ? 'Checking…' : '▶ Run Health Check'}
+            <button onClick={runCheck} disabled={loading} className="btn btn-primary">
+              {loading ? '⧗ Checking…' : '▶ Run Health Check'}
             </button>
-            <button
-              onClick={runDiscover}
-              disabled={loading}
-              className="bg-purple-700 hover:bg-purple-800 disabled:opacity-50 px-4 py-1.5 rounded text-sm font-medium"
-            >
+            <button onClick={runDiscover} disabled={loading} className="btn btn-ghost">
               🔍 Auto-Discover
             </button>
           </div>
 
           {/* Capability finder */}
-          <div className="flex gap-2 mt-4">
-            <input
-              type="text"
-              placeholder="Find best API for capability… (e.g. web_search, ai_completion)"
-              value={capability}
-              onChange={(e) => setCapability(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && findIntegration()}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm"
-            />
-            <button
-              onClick={findIntegration}
-              disabled={loading || !capability.trim()}
-              className="bg-green-700 hover:bg-green-800 disabled:opacity-50 px-4 py-1.5 rounded text-sm font-medium"
-            >
-              ⚡ Integrate
-            </button>
+          <div>
+            <p className="section-label mb-1.5">Find Best API for Capability</p>
+            <div className="flex gap-2">
+              <input
+                className="input"
+                placeholder="e.g. web_search, ai_completion, crypto_prices…"
+                value={capability}
+                onChange={e => setCapability(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && findIntegration()}
+              />
+              <button onClick={findIntegration} disabled={loading || !capability.trim()} className="btn btn-primary shrink-0">
+                ⚡ Integrate
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Integration result */}
         {integrateResult && (
-          <div className="bg-gray-900 rounded-lg p-4 border border-green-900 mb-6">
-            <h3 className="text-sm font-semibold text-green-400 mb-2">Integration Result</h3>
-            <pre className="text-xs text-gray-300 overflow-auto">
+          <div className="card p-5 mb-6" style={{ borderColor: 'rgba(16,217,138,0.3)' }}>
+            <p className="section-label mb-2" style={{ color: 'var(--green)' }}>Integration Result</p>
+            <pre className="mono text-xs overflow-auto" style={{ color: 'var(--text-muted)' }}>
               {JSON.stringify(integrateResult, null, 2)}
             </pre>
           </div>
@@ -208,15 +162,13 @@ export default function ToolsPage() {
 
         {/* Discovery result */}
         {discovery && (
-          <div className="bg-gray-900 rounded-lg p-4 border border-purple-900 mb-6">
-            <h3 className="text-sm font-semibold text-purple-400 mb-2">
-              🔍 Capability Map (auto-discovered)
-            </h3>
+          <div className="card p-5 mb-6" style={{ borderColor: 'rgba(124,92,252,0.3)' }}>
+            <p className="section-label mb-3" style={{ color: '#a78bfa' }}>🔍 Capability Map</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {Object.entries(discovery).map(([cap, apis]) => (
-                <div key={cap} className="bg-gray-800 rounded p-2">
-                  <div className="text-xs font-mono text-purple-300">{cap}</div>
-                  <div className="text-xs text-gray-400">{(apis as string[]).join(', ')}</div>
+                <div key={cap} className="card p-3">
+                  <div className="mono text-xs font-bold" style={{ color: '#a78bfa' }}>{cap}</div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{(apis as string[]).join(', ')}</div>
                 </div>
               ))}
             </div>
@@ -226,74 +178,60 @@ export default function ToolsPage() {
         {/* Category filter */}
         {results.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">
-            {categories.map((cat) => (
+            {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setFilter(cat)}
-                className={`px-3 py-1 rounded text-xs font-medium border transition-colors ${
-                  filter === cat
-                    ? 'bg-gray-700 border-gray-500 text-white'
-                    : 'bg-transparent border-gray-800 text-gray-400 hover:border-gray-600'
-                }`}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  background:   filter === cat ? 'var(--accent-soft)' : 'transparent',
+                  color:        filter === cat ? '#a78bfa' : 'var(--text-muted)',
+                  border:       `1px solid ${filter === cat ? 'rgba(124,92,252,0.4)' : 'var(--border)'}`,
+                }}
               >
-                {cat === 'all' ? 'All' : CATEGORY_LABELS[cat] ?? cat}
+                {cat === 'all' ? 'All' : (CATEGORY_LABELS[cat] ?? cat)}
               </button>
             ))}
           </div>
         )}
 
-        {/* Results table */}
-        {filtered.length > 0 && (
-          <div className="space-y-2">
-            {filtered.map((r) => (
-              <div
-                key={r.apiId}
-                className="bg-gray-900 rounded-lg p-3 border border-gray-800 flex items-center gap-4"
-              >
-                <span className="text-lg w-6">{STATUS_ICONS[r.status]}</span>
+        {/* Results list */}
+        <div className="space-y-2">
+          {filtered.map((r, i) => {
+            const meta = STATUS_META[r.status];
+            return (
+              <div key={r.apiId} className="card p-3 flex items-center gap-4 animate-fade-up" style={{ animationDelay: `${0.02 * i}s` }}>
+                <span className="text-lg w-6 shrink-0">{meta.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm">{r.apiName}</span>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded border ${STATUS_COLORS[r.status]}`}
-                    >
-                      {r.status}
-                    </span>
-                    {r.keyless && (
-                      <span className="text-xs px-2 py-0.5 rounded border border-blue-900 text-blue-400">
-                        keyless
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-600">
-                      {CATEGORY_LABELS[r.category] ?? r.category}
-                    </span>
+                    <span className="font-semibold text-sm text-white">{r.apiName}</span>
+                    <span className={meta.badge}>{meta.label}</span>
+                    {r.keyless && <span className="badge badge-cyan">keyless</span>}
+                    <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{CATEGORY_LABELS[r.category] ?? r.category}</span>
                   </div>
                   {r.provides.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {r.provides.map((p) => (
-                        <span
-                          key={p}
-                          className="text-xs bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded font-mono"
-                        >
-                          {p}
-                        </span>
+                      {r.provides.map(p => (
+                        <span key={p} className="text-[10px] px-1.5 py-0.5 rounded mono" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>{p}</span>
                       ))}
                     </div>
                   )}
-                  {r.error && <div className="text-xs text-red-400 mt-0.5">{r.error}</div>}
+                  {r.error && <p className="text-xs mt-0.5" style={{ color: 'var(--red)' }}>{r.error}</p>}
                 </div>
-                <div className="text-right text-xs text-gray-500 shrink-0">
+                <div className="text-right text-xs shrink-0" style={{ color: 'var(--text-dim)' }}>
                   {r.latencyMs != null && <div>{r.latencyMs}ms</div>}
                   {r.statusCode != null && <div>HTTP {r.statusCode}</div>}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
 
         {results.length === 0 && !loading && (
-          <div className="text-center text-gray-500 py-12">
-            <p>No results yet. Run a health check to get started.</p>
+          <div className="text-center py-20 animate-fade-up">
+            <span className="text-5xl">🔌</span>
+            <p className="mt-4 font-medium text-white">No results yet.</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Run a health check to get started.</p>
           </div>
         )}
       </div>
