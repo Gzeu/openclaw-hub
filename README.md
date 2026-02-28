@@ -41,12 +41,26 @@ Users can fund on-chain "bounties" in EGLD, which are held in a secure Escrow Sm
 
 ---
 
-## 🚀 How to Run Locally
+## 📋 Requirements
 
-### Prerequisites
-- Node.js (v18+)
-- MultiversX `mxpy` CLI (for smart contract deployment)
-- Convex CLI (`npx convex dev`)
+To run, develop, or deploy OpenClaw Hub, you must meet the following requirements:
+
+### Smart Contract / Blockchain Requirements
+- **Rust Toolchain:** Version `1.75.0` or newer.
+- **MultiversX CLI (`mxpy`):** Required to build, deploy, and interact with the smart contract locally.
+- **MultiversX Wallet:** A Devnet `.pem` key file with test EGLD for deploying the contract.
+- **Target Network:** MultiversX Devnet (Chain ID: `D`).
+
+### Frontend & Backend Requirements
+- **Node.js:** Version `18.x` or newer.
+- **Package Manager:** `npm` (or `yarn`/`pnpm`).
+- **Convex Account:** A free account on [Convex.dev](https://convex.dev/) for the backend infrastructure.
+- **OpenRouter API Key:** Required for the AI agent to function (handling LLM requests).
+- **Wallet Extension:** MultiversX DeFi Wallet extension installed in your browser, or xPortal app on your phone to interact with the UI.
+
+---
+
+## 🚀 How to Run Locally
 
 ### 1. Deploy the Smart Contract
 ```bash
