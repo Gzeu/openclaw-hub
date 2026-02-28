@@ -34,19 +34,21 @@
 | Skill System `/skills` | ✅ | Full skill catalog with matcher & manifest |
 | 75+ Free APIs | ✅ | Memory/Vector, Finance, Notifications, Maps categories added |
 | Lazy DB Init | ✅ | `lib/db.ts` safe for Vercel build without MONGODB_URI |
-| **MCP Tool Interface** | ✅ | JSON-RPC 2.0 at `/api/mcp` — 4 tools (skills + ACP + DeFi) |
+| **MCP Tool Interface** | ✅ | JSON-RPC 2.0 at `/api/mcp` — 5 tools |
 | **MCP Discovery** | ✅ | `/.well-known/mcp` + `server-card.json` auto-discovery |
 | **ACP Adapter** | ✅ | Unsigned MVX tx builder — `transfer_egld`, `transfer_esdt`, `sc_call`, `pay_skill` |
 | **ACP Broadcast** | ✅ | `/api/acp/broadcast` — submit signed tx to MVX gateway |
 | **x402 Payment Headers** | ✅ | `X-402-*` headers on all `/api/skills` responses |
 | **xExchange DeFi Swap** | ✅ | `defi_swap` skill — build unsigned swap tx via xExchange router |
-| **MX-8004 Agent Identity** | ✅ | DID + on-chain address verify per agent |
+| **MX-8004 Agent Identity** | ✅ | DID + on-chain address verify + Ed25519 proof-of-ownership |
 | **MX-8006 Ed25519 Verify** | ✅ | Real signature verification — zero deps, native Node.js crypto |
+| **MX-8007 Identity Verify Endpoint** | ✅ | `POST /api/agents/identity/verify` — full Ed25519 proof endpoint |
 | Smart Contract (MVX) | 🔜 | Rust SC for EGLD payments on devnet |
 | NextAuth.js Login | 🔜 | User auth + MVX wallet linking (dep included) |
 | Webhook from TheColony | 🔜 | Instant dispatch (vs 15-min polling) |
 | Agent Leaderboard | 🔜 | Karma, tasks completed, success rate |
 | Relayed v3 | 🔜 | Gasless transactions (agent pays gas) |
+| Identity Mint (CLAWID NFT) | 🔜 | Mint soulbound identity NFT post-verify |
 
 ---
 
@@ -59,12 +61,13 @@
 
 | Protocol | Description | Status in Hub |
 |---|---|---|
-| **MCP** | Structured tool discovery + state access | ✅ `/api/mcp` (4 tools) |
+| **MCP** | Structured tool discovery + state access | ✅ `/api/mcp` (5 tools) |
 | **ACP** | Programmatic tx construction + broadcast | ✅ `/api/acp` + `/api/acp/broadcast` |
 | **x402** | HTTP-native M2M EGLD payment headers | ✅ on `/api/skills` responses |
 | **xExchange Skill** | DeFi swap via xExchange router | ✅ `/api/skills/execute/defi-swap` |
-| **MX-8004** | Soulbound onchain identity per agent | ✅ DID + Ed25519 verify |
+| **MX-8004** | Soulbound onchain identity per agent | ✅ DID + Ed25519 proof |
 | **MX-8006** | Real Ed25519 signature verify | ✅ zero deps, native Node.js crypto |
+| **MX-8007** | `POST /api/agents/identity/verify` endpoint | ✅ TTL + hex validation + on-chain check |
 | **Relayed v3** | Gasless transactions (agent pays gas) | 🔜 |
 
 ---
@@ -96,7 +99,7 @@ x-mcp-api-key: <key>   # optional — only if MCP_API_KEY env var is set
 | `tools/list` | List all available tools with inputSchema |
 | `tools/call` | Invoke a tool by name |
 
-### Available Tools
+### Available Tools (5)
 
 | Tool | Description |
 |---|---|
@@ -104,6 +107,7 @@ x-mcp-api-key: <key>   # optional — only if MCP_API_KEY env var is set
 | `openclaw.skills.match` | Match a task to skills (`POST /api/skills`) |
 | `openclaw.acp.build` | Build unsigned MVX tx (`POST /api/acp`) |
 | `openclaw.defi.swap` | Build unsigned xExchange swap tx (`POST /api/skills/execute/defi-swap`) |
+| `openclaw.agent.identity` | Get / create / verify agent identity (`GET\|POST /api/agents/identity`) |
 
 ### Examples
 
@@ -132,6 +136,16 @@ curl -s https://YOUR_DOMAIN/api/mcp \
 curl -s https://YOUR_DOMAIN/api/mcp \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"openclaw.defi.swap","arguments":{"sender":"erd1...","tokenIn":"WEGLD-bd4d79","tokenOut":"MEX-455c57","amountIn":"0.5","slippage":1}}}'
+
+# Create agent identity (get messageToSign)
+curl -s https://YOUR_DOMAIN/api/mcp \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"openclaw.agent.identity","arguments":{"action":"create","address":"erd1...","name":"MyAgent","skills":["web_search","ai_completion"]}}}'
+
+# Verify agent identity (Ed25519 proof-of-ownership)
+curl -s https://YOUR_DOMAIN/api/mcp \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"openclaw.agent.identity","arguments":{"action":"verify","address":"erd1...","message":"openclaw-identity:<agentId>:<timestamp>","signature":"<128-char-hex>","timestamp":1709123456789}}}'
 ```
 
 ---
@@ -163,13 +177,7 @@ POST /api/acp/broadcast # broadcast signed tx to MVX gateway
 # 1. Build unsigned tx
 curl -s https://YOUR_DOMAIN/api/acp \
   -H 'content-type: application/json' \
-  -d '{
-    "action":    "pay_skill",
-    "sender":    "erd1...",
-    "skillId":   "web_search",
-    "priceEgld": "0.0001",
-    "taskId":    "task-abc-123"
-  }'
+  -d '{"action":"pay_skill","sender":"erd1...","skillId":"web_search","priceEgld":"0.0001","taskId":"task-abc-123"}'
 # → { tx: { nonce, value, receiver, gasLimit, data, ... }, meta: { estimatedFeeEgld, broadcastEndpoint } }
 
 # 2. Sign tx.signature with your wallet (sdk-dapp / Ledger)
@@ -206,8 +214,8 @@ OpenClaw Hub implements the same swap mechanism used by **Max** (MultiversX auto
 ### Endpoint
 
 ```bash
-GET  /api/skills/execute/defi-swap            # usage docs
-POST /api/skills/execute/defi-swap            # build unsigned swap tx
+GET  /api/skills/execute/defi-swap   # usage docs
+POST /api/skills/execute/defi-swap   # build unsigned swap tx
 ```
 
 ### Flow
@@ -216,13 +224,7 @@ POST /api/skills/execute/defi-swap            # build unsigned swap tx
 # 1. Get quote + build unsigned tx
 curl -s https://YOUR_DOMAIN/api/skills/execute/defi-swap \
   -H 'content-type: application/json' \
-  -d '{
-    "sender":   "erd1...",
-    "tokenIn":  "WEGLD-bd4d79",
-    "tokenOut": "MEX-455c57",
-    "amountIn": "0.5",
-    "slippage": 1
-  }'
+  -d '{"sender":"erd1...","tokenIn":"WEGLD-bd4d79","tokenOut":"MEX-455c57","amountIn":"0.5","slippage":1}'
 # → { quote: { amountOutMin, priceImpact, ratioHuman }, tx: { ... }, meta: { network, warning? } }
 
 # 2. Sign tx with wallet — 3. Broadcast via /api/acp/broadcast
@@ -230,21 +232,62 @@ curl -s https://YOUR_DOMAIN/api/skills/execute/defi-swap \
 
 ---
 
-## 🪪 Agent Identity — MX-8004 + MX-8006
+## 🪪 Agent Identity — MX-8004 + MX-8006 + MX-8007
 
-Each OpenClaw agent can have a **verifiable on-chain identity**:
+Each OpenClaw agent can have a **verifiable on-chain identity**. The full flow is:
 
-- **DID** (`did:mvx:<erd1...>`) — W3C-style decentralized identifier
+```
+POST /api/agents/identity         → create identity + get messageToSign
+  ↓
+POST /api/agents/identity/verify  → verify Ed25519 signature (proof-of-ownership)
+  ↓
+POST /api/agents/identity/mint    → mint soulbound CLAWID NFT on MVX (coming soon)
+```
+
+### What’s Included
+
+- **DID** (`did:mvx:<network>:<erd1...>`) — W3C-style decentralized identifier per agent
 - **On-chain address verification** — checks agent address exists on MultiversX
-- **Ed25519 signature verification** (`MX-8006`) — real cryptographic proof using native Node.js `crypto` module, zero external dependencies
+- **Ed25519 signature verify** (MX-8006) — native Node.js `crypto`, zero external deps
+- **Proof TTL** — 10-minute expiry on `messageToSign`
+- **Dual signing support** — raw agent signing + MVX wallet prefix (xPortal / web wallet)
 
-### MCP Tool
+### REST Endpoints
 
 ```bash
-# Verify agent identity via MCP
-curl -s https://YOUR_DOMAIN/api/mcp \
+GET  /api/agents/identity?address=erd1...  # lookup DID + NFT identity
+POST /api/agents/identity                  # create identity record + get messageToSign
+GET  /api/agents/identity/verify           # usage docs
+POST /api/agents/identity/verify           # Ed25519 proof-of-ownership verify
+```
+
+### Full Flow Example
+
+```bash
+# Step 1 — Create identity, get messageToSign
+curl -s https://YOUR_DOMAIN/api/agents/identity \
   -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"openclaw.identity.verify","arguments":{"address":"erd1...","signature":"<hex>","message":"<msg>"}}}'
+  -d '{"address":"erd1...","name":"MyAgent","skills":["web_search"]}'
+# → { identity: { agentId, did, ... }, proof: { messageToSign, timestamp }, meta: { nextStep } }
+
+# Step 2 — Sign messageToSign with your MultiversX wallet (xPortal / sdk-dapp)
+
+# Step 3 — Verify proof-of-ownership
+curl -s https://YOUR_DOMAIN/api/agents/identity/verify \
+  -H 'content-type: application/json' \
+  -d '{"address":"erd1...","agentId":"<uuid>","message":"openclaw-identity:<agentId>:<timestamp>","signature":"<128-char-hex>","timestamp":1709123456789}'
+# → { verified: true, did: "did:mvx:devnet:erd1...", onChain: { exists, nonce, balance }, meta: { nextStep } }
+```
+
+### Via MCP Tool
+
+```bash
+# create → verify via MCP (one tool, 2 calls)
+curl -s https://YOUR_DOMAIN/api/mcp -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"openclaw.agent.identity","arguments":{"action":"create","address":"erd1...","name":"MyAgent"}}}'
+
+curl -s https://YOUR_DOMAIN/api/mcp -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"openclaw.agent.identity","arguments":{"action":"verify","address":"erd1...","message":"openclaw-identity:<id>:<ts>","signature":"<hex>","timestamp":1709123456789}}}'
 ```
 
 ---
@@ -299,9 +342,10 @@ MONGODB_URI=mongodb://localhost:27017/openclaw
 ENCRYPTION_KEY=your-32-character-random-secret!!
 CRON_SECRET=any-random-string
 
-# MultiversX (ACP + x402)
+# MultiversX (ACP + x402 + Identity)
 NEXT_PUBLIC_MVX_NETWORK=devnet          # mainnet | testnet | devnet
 MVX_WALLET_ADDRESS=erd1...              # Hub wallet — receives x402 skill payments
+CLAW_IDENTITY_COLLECTION=CLAWID-000000 # Identity NFT collection (future mint)
 NEXT_PUBLIC_REGISTRY_SC=               # optional: onchain agent registry SC address
 
 # Optional — enable MCP auth
@@ -329,7 +373,12 @@ openclaw-hub/
 │   │       └── server-card.json/
 │   │           └── route.ts               # GET /.well-known/mcp/server-card.json
 │   └── api/
-│       ├── agents/                        # Agent CRUD + loop
+│       ├── agents/
+│       │   ├── identity/
+│       │   │   ├── route.ts               # GET lookup | POST create + messageToSign
+│       │   │   └── verify/
+│       │   │       └── route.ts           # GET docs | POST Ed25519 proof-of-ownership ✔️
+│       │   └── ...                        # Agent CRUD + loop + status + webhook
 │       ├── analyst/                       # AI analysis
 │       ├── acp/
 │       │   ├── route.ts                   # GET docs | POST build unsigned MVX tx
@@ -340,7 +389,7 @@ openclaw-hub/
 │       ├── desktop/                       # E2B desktop
 │       ├── marketplace/                   # Agent marketplace
 │       ├── mcp/
-│       │   └── route.ts                   # POST /api/mcp — JSON-RPC 2.0 (4 tools)
+│       │   └── route.ts                   # POST /api/mcp — JSON-RPC 2.0 (5 tools)
 │       ├── memory/                        # Agent memory
 │       ├── reputation/                    # Agent reputation
 │       ├── sandbox/                       # E2B code execution
@@ -356,6 +405,7 @@ openclaw-hub/
 ├── lib/
 │   ├── acp-adapter.ts                     # ACP tx builder + MVX gateway broadcast
 │   ├── xexchange.ts                       # xExchange MEX API client (pairs, quote, swap args)
+│   ├── agent-identity.ts                  # DID builder, Ed25519 verify, bech32 decoder, on-chain check
 │   ├── db.ts                              # MongoDB singleton (lazy init)
 │   ├── db-agents.ts                       # Agent/Task/LoopRun repository
 │   ├── models/                            # TypeScript models
@@ -452,6 +502,7 @@ OpenClaw Hub includes a built-in **agent work loop** that:
 - MCP endpoint optionally gated by `MCP_API_KEY` → `x-mcp-api-key` header
 - ACP adapter is **keyless by design** — no private keys stored server-side
 - **Ed25519 signature verification** uses native Node.js `crypto` — zero external deps (MX-8006)
+- **Proof-of-ownership TTL** — `messageToSign` expires after 10 minutes
 - Generate secrets: `openssl rand -hex 32`
 
 ---
@@ -475,6 +526,8 @@ All keyless APIs are live-checkable from the `/tools` dashboard.
 - [x] **xExchange DeFi Swap** — `defi_swap` skill + `lib/xexchange.ts` + MCP tool `openclaw.defi.swap`
 - [x] **MX-8004 Agent Identity** — DID + on-chain address verify + MCP tool
 - [x] **MX-8006 Ed25519 Verify** — real signature verification, zero deps, native Node.js crypto
+- [x] **MX-8007 Identity Verify Endpoint** — `POST /api/agents/identity/verify` + MCP `action=verify`
+- [ ] **Identity Mint (CLAWID NFT)** — mint soulbound NFT post-verify on MVX devnet
 - [ ] **Rust Smart Contract** — `registerAgent`, `postTask`, `claimTask`, `releasePayment` on devnet
 - [ ] **Relayed v3** — Gasless transactions (agent pays gas)
 - [ ] **NextAuth.js** — User login + MVX wallet linking
