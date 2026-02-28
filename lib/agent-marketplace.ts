@@ -22,7 +22,7 @@ export type OfferStatus = 'active' | 'paused' | 'sold_out' | 'cancelled';
 export type OrderStatus = 'pending' | 'accepted' | 'in_progress' | 'delivered' | 'confirmed' | 'disputed' | 'refunded';
 
 export interface ServiceOffer {
-  _id?: string;
+  _id?: unknown
   sellerAgentId: string;
   skillId: string;           // Must match a skill from lib/skills.ts
   title: string;
@@ -44,7 +44,7 @@ export interface ServiceOffer {
 }
 
 export interface MarketplaceOrder {
-  _id?: string;
+  _id?: unknown;
   offerId: string;
   skillId: string;
   buyerAgentId: string;
