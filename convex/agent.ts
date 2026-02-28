@@ -2,15 +2,15 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { releaseEscrowFunds } from "./hubWallet";
+import { executeTool } from "./tools";
 
 export const runAIAgent = internalAction({
   args: {
     taskId: v.id("tasks"),
     prompt: v.string(),
-    paymentId: v.optional(v.number()), // Id-ul platii din smart contract
+    paymentId: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // 1. Setăm statusul ca "in_progress"
     await ctx.runMutation(internal.tasks.updateTaskStatus, {
       taskId: args.taskId,
       status: "in_progress",
@@ -19,12 +19,53 @@ export const runAIAgent = internalAction({
     console.log(`Agent started working on task: ${args.taskId}`);
     
     try {
-      // 2. Executăm modelul AI (OpenRouter)
       const apiKey = process.env.OPENROUTER_API_KEY;
       let aiResponseText = "Simulated success (no API key set)";
 
       if (apiKey) {
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        // Definim tool-urile (funcțiile) pe care agentul le poate apela
+        const tools = [
+          {
+            type: "function",
+            function: {
+              name: "getAccountBalance",
+              description: "Get the current EGLD balance and tokens for a MultiversX (erd1...) address.",
+              parameters: {
+                type: "object",
+                properties: {
+                  address: {
+                    type: "string",
+                    description: "The MultiversX wallet address starting with erd1",
+                  }
+                },
+                required: ["address"],
+              },
+            }
+          },
+          {
+            type: "function",
+            function: {
+              name: "getNetworkConfig",
+              description: "Get current MultiversX network configuration, token price, and current round/epoch.",
+              parameters: {
+                type: "object",
+                properties: {},
+                required: [],
+              },
+            }
+          }
+        ];
+
+        // 1. Primul request către LLM (îi dăm prompt-ul și tool-urile)
+        const messages: any[] = [
+          { 
+            role: "system", 
+            content: "You are an expert Web3 AI agent on the OpenClaw Hub network, specialized in the MultiversX blockchain. You can use available tools to query the blockchain. Answer clearly and concisely. Format numerical values (like balances) in a human-readable way (EGLD has 18 decimals)." 
+          },
+          { role: "user", content: args.prompt }
+        ];
+
+        const initialResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${apiKey}`,
@@ -33,46 +74,78 @@ export const runAIAgent = internalAction({
             "X-Title": "OpenClaw Hub",
           },
           body: JSON.stringify({
-            model: "anthropic/claude-3-haiku",
-            messages: [
-              { role: "system", content: "You are an expert AI agent inside the OpenClaw Hub network. Complete the user's task to the best of your ability." },
-              { role: "user", content: args.prompt }
-            ]
+            model: "anthropic/claude-3-haiku", // Haiku suportă tool calling foarte bine
+            messages: messages,
+            tools: tools,
+            tool_choice: "auto"
           })
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          aiResponseText = data.choices[0].message.content;
+        if (!initialResponse.ok) throw new Error("Agent API initial request failed.");
+        const initialData = await initialResponse.json();
+        const responseMessage = initialData.choices[0].message;
+
+        // 2. Verificăm dacă LLM-ul a decis să apeleze un tool
+        if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+          console.log("Agent requested tool calls:", responseMessage.tool_calls);
+          
+          messages.push(responseMessage); // Adăugăm răspunsul lui (cu intenția de a apela tool-ul) în istoric
+          
+          // Executăm toate tool-urile cerute
+          for (const toolCall of responseMessage.tool_calls) {
+            const functionName = toolCall.function.name;
+            const functionArgs = JSON.parse(toolCall.function.arguments);
+            
+            // Apelăm funcția reală care face request la MultiversX API
+            const functionResult = await executeTool(functionName, functionArgs);
+            
+            // Adăugăm rezultatul în istoric ca să-l citească LLM-ul
+            messages.push({
+              tool_call_id: toolCall.id,
+              role: "tool",
+              name: functionName,
+              content: functionResult,
+            });
+          }
+
+          // 3. Al doilea request către LLM (acum are datele de pe blockchain)
+          const finalResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "anthropic/claude-3-haiku",
+              messages: messages
+            })
+          });
+
+          const finalData = await finalResponse.json();
+          aiResponseText = finalData.choices[0].message.content;
+
         } else {
-          throw new Error("Agent API request failed.");
+          // LLM-ul a răspuns direct, fără să folosească tools
+          aiResponseText = responseMessage.content;
         }
+
       } else {
         await new Promise((resolve) => setTimeout(resolve, 3000));
         aiResponseText = `I have simulated the execution of: "${args.prompt}"`;
       }
 
-      // 3. Salvăm rezultatul task-ului (dar păstrăm statusul pentru UI pe moment)
       await ctx.runMutation(internal.tasks.saveAgentResult, {
         taskId: args.taskId,
         result: aiResponseText,
       });
 
-      // 4. Executăm tranzacția de release pe rețeaua MultiversX folosind portofelul Hub-ului
       if (args.paymentId !== undefined) {
-          console.log(`Calling Smart Contract release for payment ID: ${args.paymentId}`);
           try {
             const releaseTxHash = await releaseEscrowFunds(args.paymentId);
             console.log(`Release successful! TxHash: ${releaseTxHash}`);
-            
-            // Salvăm hash-ul de release (opțional poți face o mutație pt asta)
           } catch (scError) {
              console.error("Smart Contract release failed:", scError);
-             // Nu picăm tot task-ul dacă fail-uie doar tranzacția, 
-             // dar într-un mediu de producție ar trebui un mecanism de retry.
           }
-      } else {
-          console.log("No paymentId provided. Skipping Smart Contract release (Simulation only).");
       }
 
     } catch (error) {
@@ -81,7 +154,6 @@ export const runAIAgent = internalAction({
         taskId: args.taskId,
         status: "failed",
       });
-      // Aici (la fel ca mai sus) s-ar chema hubWallet.ts dar cu metoda refund()
     }
   },
 });
