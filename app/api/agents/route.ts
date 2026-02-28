@@ -35,7 +35,7 @@ export async function GET() {
           label: mvx.agentId,
           address: mvx.address,
           capabilities: mvx.capabilities,
-          pricePerTask: mvx.pricePerTask,
+          pricePerTask: mvx.pricePerTask ?? null,
           online: false,
         })
       }
