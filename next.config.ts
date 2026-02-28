@@ -1,12 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Treat @multiversx packages as server-side externals
-  // so Node.js built-in 'crypto' is resolved natively
-  serverExternalPackages: ['@multiversx/sdk-core', '@multiversx/sdk-wallet'],
+  // Transpile @multiversx packages so Next.js handles crypto polyfilling
+  transpilePackages: [
+    '@multiversx/sdk-core',
+    '@multiversx/sdk-wallet',
+    '@multiversx/sdk-network-providers',
+  ],
 
   webpack: (config, { isServer }) => {
-    // Polyfills for browser bundle
+    // Polyfills for browser bundle - crypto: false means use browser native crypto
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
