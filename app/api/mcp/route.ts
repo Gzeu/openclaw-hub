@@ -96,17 +96,28 @@ const TOOLS = [
   {
     name: 'openclaw.agent.identity',
     description:
-      'Get or create an OpenClaw agent on-chain identity. ' +
+      'Manage OpenClaw agent on-chain identity. ' +
       'action=get: lookup DID + NFT identity tokens for an erd1 address. ' +
-      'action=create: register a new agent identity off-chain and return the message to sign for proof-of-ownership.',
+      'action=create: register a new agent identity off-chain and return the message to sign for proof-of-ownership. ' +
+      'action=verify: verify Ed25519 proof-of-ownership (use messageToSign + timestamp from create response). ' +
+      'Zero external dependencies — Ed25519 verify uses native Node.js crypto.',
     inputSchema: {
       type: 'object',
       properties: {
-        action:      { type: 'string', enum: ['get', 'create'], description: 'get=lookup existing, create=new identity' },
-        address:     { type: 'string', description: 'erd1... MultiversX address of the agent.' },
-        name:        { type: 'string', description: 'Agent display name (required for create).' },
-        description: { type: 'string', description: 'Short description of the agent (create).' },
+        action: {
+          type: 'string',
+          enum: ['get', 'create', 'verify'],
+          description:
+            'get=lookup existing identity | create=register new + get messageToSign | verify=Ed25519 proof-of-ownership',
+        },
+        address:     { type: 'string',  description: 'erd1... MultiversX address of the agent.' },
+        name:        { type: 'string',  description: 'Agent display name (required for create).' },
+        description: { type: 'string',  description: 'Short description of the agent (create).' },
         skills:      { type: 'array', items: { type: 'string' }, description: 'Skill IDs the agent offers (create).' },
+        agentId:     { type: 'string',  description: 'Agent UUID from create response (optional for verify).' },
+        message:     { type: 'string',  description: 'messageToSign from create response (required for verify).' },
+        signature:   { type: 'string',  description: '128-char hex Ed25519 signature (required for verify).' },
+        timestamp:   { type: 'number',  description: 'timestamp from create response (required for verify).' },
       },
       required: ['action', 'address'],
       additionalProperties: false,
@@ -198,12 +209,14 @@ export async function POST(req: NextRequest) {
     const name = body.params?.name
     const args = body.params?.arguments ?? {}
 
+    // ─── openclaw.skills.list
     if (name === 'openclaw.skills.list') {
       const { status, json } = await proxyJson(origin, '/api/skills')
       if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Upstream /api/skills failed', { status }), { headers: BASE_HEADERS })
       return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
     }
 
+    // ─── openclaw.skills.match
     if (name === 'openclaw.skills.match') {
       if (typeof args.task !== 'string' || !args.task.trim()) {
         return NextResponse.json(rpcErr(id, -32602, 'Invalid params: task (string) is required'), { headers: BASE_HEADERS })
@@ -213,6 +226,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
     }
 
+    // ─── openclaw.acp.build
     if (name === 'openclaw.acp.build') {
       if (!args.action || !args.sender) {
         return NextResponse.json(rpcErr(id, -32602, 'Invalid params: action and sender are required'), { headers: BASE_HEADERS })
@@ -222,6 +236,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
     }
 
+    // ─── openclaw.defi.swap
     if (name === 'openclaw.defi.swap') {
       if (!args.sender || !args.tokenIn || !args.tokenOut || !args.amountIn) {
         return NextResponse.json(
@@ -237,6 +252,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
     }
 
+    // ─── openclaw.agent.identity
     if (name === 'openclaw.agent.identity') {
       if (!args.action || !args.address) {
         return NextResponse.json(
@@ -244,6 +260,8 @@ export async function POST(req: NextRequest) {
           { headers: BASE_HEADERS }
         )
       }
+
+      // action=get
       if (args.action === 'get') {
         const { status, json } = await proxyJson(
           origin,
@@ -252,6 +270,8 @@ export async function POST(req: NextRequest) {
         if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Identity lookup failed', { status }), { headers: BASE_HEADERS })
         return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
       }
+
+      // action=create
       if (args.action === 'create') {
         if (!args.name) {
           return NextResponse.json(
@@ -262,16 +282,42 @@ export async function POST(req: NextRequest) {
         const { status, json } = await proxyJson(origin, '/api/agents/identity', {
           method: 'POST',
           body: JSON.stringify({
-            address: args.address,
-            name: args.name,
+            address:     args.address,
+            name:        args.name,
             description: args.description ?? '',
-            skills: args.skills ?? [],
+            skills:      args.skills ?? [],
           }),
         })
         if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Identity create failed', { status, body: json }), { headers: BASE_HEADERS })
         return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
       }
-      return NextResponse.json(rpcErr(id, -32602, `Unknown action: ${args.action}`), { headers: BASE_HEADERS })
+
+      // action=verify ─ Ed25519 proof-of-ownership
+      if (args.action === 'verify') {
+        if (!args.message || !args.signature || !args.timestamp) {
+          return NextResponse.json(
+            rpcErr(id, -32602, 'Invalid params: message, signature, timestamp are required for verify'),
+            { headers: BASE_HEADERS }
+          )
+        }
+        const { status, json } = await proxyJson(origin, '/api/agents/identity/verify', {
+          method: 'POST',
+          body: JSON.stringify({
+            address:   args.address,
+            agentId:   args.agentId ?? undefined,
+            message:   args.message,
+            signature: args.signature,
+            timestamp: args.timestamp,
+          }),
+        })
+        if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Identity verify failed', { status, body: json }), { headers: BASE_HEADERS })
+        return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
+      }
+
+      return NextResponse.json(
+        rpcErr(id, -32602, `Unknown action: ${args.action}. Valid: get | create | verify`),
+        { headers: BASE_HEADERS }
+      )
     }
 
     return NextResponse.json(rpcErr(id, -32601, `Unknown tool: ${String(name)}`), { status: 404, headers: BASE_HEADERS })
