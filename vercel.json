@@ -4,5 +4,36 @@
       "path": "/api/cron/agent-loop",
       "schedule": "*/15 * * * *"
     }
+  ],
+  "functions": {
+    "app/api/cron/agent-loop.ts": {
+      "maxDuration": 60
+    },
+    "app/api/acp/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/acp/broadcast/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/mcp/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/:path*",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, x-api-key, x-cron-secret, x-mcp-api-key" }
+      ]
+    },
+    {
+      "source": "/.well-known/:path*",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    }
   ]
 }

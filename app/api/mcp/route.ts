@@ -55,6 +55,38 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'openclaw.acp.build',
+    description:
+      'Build an unsigned MultiversX transaction (ACP — Agent Commerce Protocol). ' +
+      'Returns an unsigned tx object the caller must sign and broadcast via openclaw.acp.broadcast or POST /api/acp/broadcast. ' +
+      'Actions: transfer_egld | transfer_esdt | sc_call | pay_skill.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['transfer_egld', 'transfer_esdt', 'sc_call', 'pay_skill'],
+          description: 'ACP action type.',
+        },
+        sender: { type: 'string', description: 'erd1 sender address.' },
+        receiver: { type: 'string', description: 'erd1 receiver address (transfer_egld only).' },
+        amount: { type: 'string', description: 'Amount in EGLD e.g. "0.001" (transfer_egld only).' },
+        tokenId: { type: 'string', description: 'ESDT token identifier (transfer_esdt only).' },
+        contract: { type: 'string', description: 'Smart contract erd1 address (sc_call only).' },
+        func: { type: 'string', description: 'Function name to call (sc_call only).' },
+        args: { type: 'array', items: { type: 'string' }, description: 'Hex-encoded arguments (sc_call only).' },
+        skillId: { type: 'string', description: 'Skill ID to pay for (pay_skill only).' },
+        priceEgld: { type: 'string', description: 'Price in EGLD e.g. "0.0001" (pay_skill only).' },
+        taskId: { type: 'string', description: 'Optional task correlation ID (pay_skill only).' },
+        value: { type: 'string', description: 'EGLD value to attach in raw denomination (sc_call only).' },
+        gasLimit: { type: 'number', description: 'Custom gas limit (sc_call only).' },
+        data: { type: 'string', description: 'Optional memo/data field (transfer_egld / transfer_esdt only).' },
+      },
+      required: ['action', 'sender'],
+      additionalProperties: false,
+    },
+  },
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -68,10 +100,9 @@ function rpcErr(id: JsonRpcRes['id'], code: number, message: string, data?: any)
   return { jsonrpc: '2.0', id, error: { code, message, ...(data !== undefined ? { data } : {}) } }
 }
 
-/** Optional API key guard — only active when MCP_API_KEY env var is set. */
 function checkApiKey(req: NextRequest, id: JsonRpcRes['id']): NextResponse | null {
   const key = process.env.MCP_API_KEY?.trim()
-  if (!key) return null                                 // not configured → open access
+  if (!key) return null
   const provided = req.headers.get('x-mcp-api-key') ?? ''
   if (provided !== key) {
     return NextResponse.json(
@@ -97,10 +128,6 @@ async function proxyJson(origin: string, path: string, init?: RequestInit) {
 // ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
-
-/**
- * GET /api/mcp — human-readable hint
- */
 export async function GET() {
   return NextResponse.json(
     { hint: 'POST JSON-RPC 2.0. Methods: initialize | tools/list | tools/call' },
@@ -108,18 +135,7 @@ export async function GET() {
   )
 }
 
-/**
- * POST /api/mcp — MCP JSON-RPC 2.0 endpoint
- *
- * Supported methods:
- *   initialize        — handshake + capability negotiation
- *   tools/list        — return all available tools with inputSchema
- *   tools/call        — invoke a tool by name with arguments
- *
- * Ref: https://modelcontextprotocol.info/specification/2024-11-05/server/tools/
- */
 export async function POST(req: NextRequest) {
-  // Parse body first so we can echo the id in error responses
   let body: JsonRpcReq
   try {
     body = await req.json()
@@ -129,22 +145,16 @@ export async function POST(req: NextRequest) {
 
   const id = body?.id ?? null
 
-  // Basic JSON-RPC validation
   if (!body || body.jsonrpc !== '2.0' || typeof body.method !== 'string') {
     return NextResponse.json(rpcErr(id, -32600, 'Invalid Request'), { status: 400, headers: BASE_HEADERS })
   }
 
-  // Auth guard (noop if MCP_API_KEY not set)
   const authErr = checkApiKey(req, id)
   if (authErr) return authErr
 
   const origin = new URL(req.url).origin
 
-  // -------------------------------------------------------------------------
-  // Method dispatch
-  // -------------------------------------------------------------------------
-
-  // initialize — capability handshake
+  // ── initialize ─────────────────────────────────────────
   if (body.method === 'initialize') {
     return NextResponse.json(
       ok(id, {
@@ -156,70 +166,52 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // tools/list — enumerate all tools
+  // ── tools/list ────────────────────────────────────────
   if (body.method === 'tools/list') {
     return NextResponse.json(ok(id, { tools: TOOLS }), { headers: BASE_HEADERS })
   }
 
-  // tools/call — invoke a tool
+  // ── tools/call ────────────────────────────────────────
   if (body.method === 'tools/call') {
     const name = body.params?.name
     const args = body.params?.arguments ?? {}
 
-    // openclaw.skills.list
     if (name === 'openclaw.skills.list') {
       const { status, json } = await proxyJson(origin, '/api/skills')
-      if (status >= 400) {
-        return NextResponse.json(
-          rpcErr(id, -32000, 'Upstream /api/skills failed', { status, body: json }),
-          { headers: BASE_HEADERS }
-        )
-      }
-      return NextResponse.json(
-        ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }),
-        { headers: BASE_HEADERS }
-      )
+      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Upstream /api/skills failed', { status, body: json }), { headers: BASE_HEADERS })
+      return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
     }
 
-    // openclaw.skills.match
     if (name === 'openclaw.skills.match') {
       if (typeof args.task !== 'string' || !args.task.trim()) {
-        return NextResponse.json(
-          rpcErr(id, -32602, 'Invalid params: task (string) is required'),
-          { headers: BASE_HEADERS }
-        )
+        return NextResponse.json(rpcErr(id, -32602, 'Invalid params: task (string) is required'), { headers: BASE_HEADERS })
       }
       const { status, json } = await proxyJson(origin, '/api/skills', {
         method: 'POST',
         body: JSON.stringify({ task: args.task }),
       })
-      if (status >= 400) {
-        return NextResponse.json(
-          rpcErr(id, -32000, 'Upstream POST /api/skills failed', { status, body: json }),
-          { headers: BASE_HEADERS }
-        )
-      }
-      return NextResponse.json(
-        ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }),
-        { headers: BASE_HEADERS }
-      )
+      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Upstream POST /api/skills failed', { status, body: json }), { headers: BASE_HEADERS })
+      return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
     }
 
-    return NextResponse.json(
-      rpcErr(id, -32601, `Unknown tool: ${String(name)}`),
-      { status: 404, headers: BASE_HEADERS }
-    )
+    if (name === 'openclaw.acp.build') {
+      if (!args.action || !args.sender) {
+        return NextResponse.json(rpcErr(id, -32602, 'Invalid params: action and sender are required'), { headers: BASE_HEADERS })
+      }
+      const { status, json } = await proxyJson(origin, '/api/acp', {
+        method: 'POST',
+        body: JSON.stringify(args),
+      })
+      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'ACP build failed', { status, body: json }), { headers: BASE_HEADERS })
+      return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
+    }
+
+    return NextResponse.json(rpcErr(id, -32601, `Unknown tool: ${String(name)}`), { status: 404, headers: BASE_HEADERS })
   }
 
-  return NextResponse.json(
-    rpcErr(id, -32601, `Method not found: ${body.method}`),
-    { status: 404, headers: BASE_HEADERS }
-  )
+  return NextResponse.json(rpcErr(id, -32601, `Method not found: ${body.method}`), { status: 404, headers: BASE_HEADERS })
 }
 
-/**
- * OPTIONS /api/mcp — CORS preflight
- */
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
