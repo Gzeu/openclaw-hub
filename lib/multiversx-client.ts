@@ -27,3 +27,13 @@ export function truncateAddress(addr: string, start = 6, end = 4): string {
   if (!addr || addr.length < start + end + 3) return addr
   return `${addr.slice(0, start)}...${addr.slice(-end)}`
 }
+
+// Get MVX API base URL for a given network
+export function getMvxApiBase(network: 'mainnet' | 'testnet' | 'devnet' = 'devnet'): string {
+  const apiMap: Record<string, string> = {
+    mainnet: 'https://api.multiversx.com',
+    testnet: 'https://testnet-api.multiversx.com',
+    devnet: 'https://devnet-api.multiversx.com',
+  }
+  return apiMap[network] ?? 'https://devnet-api.multiversx.com'
+}
