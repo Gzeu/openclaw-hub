@@ -1,6 +1,4 @@
 'use client'
-// MultiversX Connect Button — opens UnlockPanelManager
-// Uses sdk-dapp's built-in wallet connect panel
 import { useState } from 'react'
 
 interface Props {
@@ -16,21 +14,11 @@ export function MvxConnectButton({ onConnect, onDisconnect, className }: Props) 
   const handleConnect = async () => {
     setLoading(true)
     try {
-      const { UnlockPanelManager } = await import(
-        '@multiversx/sdk-dapp/out/managers/UnlockPanelManager'
-      )
-      const mgr = UnlockPanelManager.init({
-        loginHandler: async ({ type, anchor }: any) => {
-          const { ProviderFactory } = await import(
-            '@multiversx/sdk-dapp/out/providers/ProviderFactory'
-          )
-          const provider = await ProviderFactory.create({ type, anchor })
-          const { address: addr } = await provider.login()
-          setAddress(addr)
-          onConnect?.(addr)
-        },
-      })
-      mgr.openUnlockPanel()
+      // Redirect to MultiversX web wallet for connection
+      const walletUrl = process.env.NEXT_PUBLIC_MVX_NETWORK === 'mainnet'
+        ? 'https://wallet.multiversx.com'
+        : 'https://devnet-wallet.multiversx.com'
+      alert(`To connect your MultiversX wallet, please visit: ${walletUrl}`)
     } catch (e) {
       console.warn('[MVX] Connect error:', e)
     } finally {
@@ -38,18 +26,9 @@ export function MvxConnectButton({ onConnect, onDisconnect, className }: Props) 
     }
   }
 
-  const handleDisconnect = async () => {
-    try {
-      const { getAccountProvider } = await import(
-        '@multiversx/sdk-dapp/out/providers/helpers/accountProvider'
-      )
-      const provider = getAccountProvider()
-      await provider.logout()
-      setAddress(null)
-      onDisconnect?.()
-    } catch (e) {
-      console.warn('[MVX] Disconnect error:', e)
-    }
+  const handleDisconnect = () => {
+    setAddress(null)
+    onDisconnect?.()
   }
 
   if (address) {
