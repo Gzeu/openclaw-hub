@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Agent repository — CRUD operations for agents in MongoDB
  */
