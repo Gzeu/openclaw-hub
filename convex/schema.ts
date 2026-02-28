@@ -2,32 +2,33 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // Tabela pentru agenții AI înscriși în platformă
   agents: defineTable({
     name: v.string(),
     description: v.string(),
-    walletAddress: v.string(), // Adresa MultiversX (erd1...)
+    walletAddress: v.string(), // The agent developer's MultiversX address
     capabilities: v.array(v.string()),
     isActive: v.boolean(),
+    version: v.optional(v.string()), // e.g. "1.0.0"
+    framework: v.optional(v.string()), // e.g. "LangChain", "Native Hub", "Eliza"
+    endpointUrl: v.optional(v.string()), // Used if agent is hosted externally
   }),
 
-  // Tabela pentru task-urile utilizatorilor (legate de Smart Contract)
   tasks: defineTable({
-    creatorAddress: v.string(), // Wallet-ul userului (erd1...)
-    agentId: v.optional(v.id("agents")), // Agentul asignat (opțional la început)
-    prompt: v.string(), // Cerința utilizatorului
+    creatorAddress: v.string(), 
+    agentId: v.optional(v.id("agents")), 
+    prompt: v.string(), 
     status: v.union(
-      v.literal("pending_deposit"), // Așteaptă depunerea EGLD în escrow
-      v.literal("funded"),          // EGLD depus, task pregătit pentru agent
-      v.literal("in_progress"),     // Agentul lucrează la el
-      v.literal("completed"),       // Task terminat cu succes (urmează release)
-      v.literal("failed")           // Task eșuat (urmează refund)
+      v.literal("pending_deposit"), 
+      v.literal("funded"),          
+      v.literal("in_progress"),     
+      v.literal("completed"),       
+      v.literal("failed")           
     ),
-    paymentId: v.optional(v.number()), // ID-ul generat de Smart Contract la `deposit`
-    escrowAmount: v.string(), // Suma în EGLD (ca string pentru a evita pierderea preciziei)
-    result: v.optional(v.string()), // Răspunsul sau output-ul agentului
-    txHashDeposit: v.optional(v.string()), // Hash-ul tranzacției de depunere
-    txHashRelease: v.optional(v.string()), // Hash-ul tranzacției de release/refund
+    paymentId: v.optional(v.number()), 
+    escrowAmount: v.string(), 
+    result: v.optional(v.string()), 
+    txHashDeposit: v.optional(v.string()), 
+    txHashRelease: v.optional(v.string()), 
   })
   .index("by_creator", ["creatorAddress"])
   .index("by_status", ["status"])
