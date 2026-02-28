@@ -1,0 +1,11 @@
+[package]
+name = "openclaw-payments-meta"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+openclaw-payments = { path = ".." }
+multiversx-sc-meta = "0.64.0"
+
+[workspace]

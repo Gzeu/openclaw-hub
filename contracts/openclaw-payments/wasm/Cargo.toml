@@ -1,0 +1,14 @@
+[package]
+name = "openclaw-payments-wasm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+openclaw-payments = { path = ".." }
+multiversx-sc-wasm-adapter = "0.64.0"
+
+[workspace]
