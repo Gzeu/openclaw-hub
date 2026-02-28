@@ -11,7 +11,6 @@ export const getActiveAgents = query({
   },
 });
 
-// A function for developers to register their external agents
 export const registerAgent = mutation({
   args: {
     name: v.string(),
@@ -30,7 +29,6 @@ export const registerAgent = mutation({
   },
 });
 
-// Initial seed function to populate the DB with our native agent
 export const seedNativeAgent = mutation({
   args: {},
   handler: async (ctx) => {
@@ -38,8 +36,8 @@ export const seedNativeAgent = mutation({
     if (existing.length === 0) {
       await ctx.db.insert("agents", {
         name: "OpenClaw Base Agent",
-        description: "Native Hub LLM (Claude 3) equipped with MultiversX tool calling. Fast, reliable, and runs on-platform.",
-        walletAddress: "erd1qqqqqqqqqqqqqpgq...replace_with_hub_address", // Banii raman in hub default
+        description: "Native Hub LLM equipped with MultiversX tool calling. Fast, reliable, and runs on-platform.",
+        walletAddress: "erd1qqqqqqqqqqqqqpgq...replace_with_hub_address", 
         capabilities: ["MultiversX Queries", "Token Balances", "Network Stats", "General AI"],
         isActive: true,
         version: "1.0",

@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useGetAccountInfo } from "@multiversx/sdk-dapp/hooks/account/useGetAccountInfo";
 import { useGetIsLoggedIn } from "@multiversx/sdk-dapp/hooks/account/useGetIsLoggedIn";
 import { ExtensionLoginButton, WebWalletLoginButton } from "@multiversx/sdk-dapp/UI";
@@ -17,6 +17,7 @@ export default function Home() {
   
   const tasks = useQuery(api.tasks.getTasks, {});
   const activeAgents = useQuery(api.agents.getActiveAgents, {});
+  const seedNativeAgent = useMutation(api.agents.seedNativeAgent);
   
   const createTask = useMutation(api.tasks.createTask);
   const attachTxHashToTask = useMutation(api.tasks.attachTxHashToTask);
@@ -24,6 +25,7 @@ export default function Home() {
   const [prompt, setPrompt] = useState("");
   const [amount, setAmount] = useState("0.1"); // EGLD
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const hasSeeded = useRef(false);
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -53,12 +55,17 @@ export default function Home() {
     }
   }, [transactionStatus.isSuccessful, transactionStatus.isFailed, transactionStatus.isCancelled]);
 
-  // Set first agent as default when they load
+  // Auto-seed mechanism and default selection
   useEffect(() => {
+    if (activeAgents !== undefined && activeAgents.length === 0 && !hasSeeded.current) {
+      hasSeeded.current = true;
+      seedNativeAgent().catch(console.error);
+    }
+    
     if (activeAgents && activeAgents.length > 0 && !selectedAgentId) {
       setSelectedAgentId(activeAgents[0]._id);
     }
-  }, [activeAgents, selectedAgentId]);
+  }, [activeAgents, selectedAgentId, seedNativeAgent]);
 
   const handleCreateAndDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +128,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-gray-100 font-sans selection:bg-indigo-500/30">
-      {/* Navbar */}
       <nav className="border-b border-white/5 bg-[#0a0a0b]/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -160,11 +166,7 @@ export default function Home() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-10">
-        
-        {/* LEFT COLUMN: Agent Selection & Deployment */}
         <section className="lg:col-span-5 h-fit lg:sticky lg:top-28 space-y-6">
-          
-          {/* Marketplace Selection */}
           <div>
             <h2 className="text-lg font-semibold mb-4 text-white flex items-center gap-2">
               <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
@@ -203,9 +205,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Deployment Form */}
           <div className="bg-[#121214] p-6 rounded-3xl border border-white/5 shadow-2xl relative overflow-hidden">
-            {/* Glow effect */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50"></div>
             
             <h2 className="text-lg font-semibold mb-5 text-white">Deploy Objective</h2>
@@ -255,7 +255,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* RIGHT COLUMN: Tasks Feed */}
         <section className="lg:col-span-7">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">

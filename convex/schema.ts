@@ -8,9 +8,9 @@ export default defineSchema({
     walletAddress: v.string(), // The agent developer's MultiversX address
     capabilities: v.array(v.string()),
     isActive: v.boolean(),
-    version: v.optional(v.string()), // e.g. "1.0.0"
-    framework: v.optional(v.string()), // e.g. "LangChain", "Native Hub", "Eliza"
-    endpointUrl: v.optional(v.string()), // Used if agent is hosted externally
+    version: v.optional(v.string()),
+    framework: v.optional(v.string()),
+    endpointUrl: v.optional(v.string()),
   }),
 
   tasks: defineTable({
