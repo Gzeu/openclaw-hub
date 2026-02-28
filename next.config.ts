@@ -12,6 +12,21 @@ const nextConfig: NextConfig = {
         '@multiversx/sdk-dapp',
       ];
     }
+
+    if (!isServer) {
+      // Polyfills for Node.js built-ins used by @multiversx/sdk-core in browser
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        crypto: false,
+        stream: false,
+        buffer: false,
+        path: false,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+
     return config;
   },
 };
