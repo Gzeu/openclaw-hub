@@ -14,6 +14,7 @@ pub enum PaymentStatus {
 pub struct Payment<M: ManagedTypeApi> {
     pub payer: ManagedAddress<M>,
     pub payee: ManagedAddress<M>,
+    pub token_identifier: TokenIdentifier<M>, // Suporta acum atat EGLD cat si ESDT (USDC, MEX etc)
     pub amount: BigUint<M>,
     pub task_id: ManagedBuffer<M>,
     pub status: PaymentStatus,
@@ -32,18 +33,20 @@ pub trait OpenClawPayments {
         }
     }
 
-    // --- Core: EGLD escrow --------------------------------------------------
+    // --- Core: EGLD & ESDT escrow -------------------------------------------
 
-    /// Payer deposits EGLD for a task, to be released later to `payee`.
-    #[payable("EGLD")]
+    /// Payer deposits EGLD or any ESDT for a task, to be released later to `payee`.
+    #[payable("*")]
     #[endpoint(deposit)]
     fn deposit(
         &self,
         payee: ManagedAddress,
         task_id: ManagedBuffer,
     ) -> u64 {
-        let amount = self.call_value().egld_value().clone_value();
-        require!(amount > 0u32, "Deposit amount must be > 0");
+        // Preluam automat ce token s-a trimis (EGLD sau un anumit ESDT)
+        let (payment_token, payment_amount) = self.call_value().single_fungible_tc();
+        
+        require!(payment_amount > 0u32, "Deposit amount must be > 0");
         require!(payee != ManagedAddress::zero(), "Invalid payee");
 
         let payer = self.blockchain().get_caller();
@@ -55,14 +58,15 @@ pub trait OpenClawPayments {
         let p = Payment {
             payer: payer.clone(),
             payee: payee.clone(),
-            amount: amount.clone(),
+            token_identifier: payment_token.clone(),
+            amount: payment_amount.clone(),
             task_id: task_id.clone(),
             status: PaymentStatus::Deposited,
             created_at: now,
         };
 
         self.payments(id).set(&p);
-        self.deposit_event(id, &payer, &payee, &amount, &task_id);
+        self.deposit_event(id, &payer, &payee, &payment_token, &payment_amount, &task_id);
 
         id
     }
@@ -77,13 +81,15 @@ pub trait OpenClawPayments {
 
         let payee = p.payee.clone();
         let amount = p.amount.clone();
+        let token = p.token_identifier.clone();
 
-        self.send().direct_egld(&payee, &amount);
+        // `direct` trimite token-ul salvat initial inapoi, indiferent ca e EGLD sau ESDT
+        self.send().direct(&payee, &token, 0, &amount);
 
         p.status = PaymentStatus::Released;
         self.payments(payment_id).set(&p);
 
-        self.release_event(payment_id, &payee, &amount);
+        self.release_event(payment_id, &payee, &token, &amount);
     }
 
     /// Refund funds to payer. Intended to be called by Hub/owner when task fails/cancels.
@@ -96,13 +102,14 @@ pub trait OpenClawPayments {
 
         let payer = p.payer.clone();
         let amount = p.amount.clone();
+        let token = p.token_identifier.clone();
 
-        self.send().direct_egld(&payer, &amount);
+        self.send().direct(&payer, &token, 0, &amount);
 
         p.status = PaymentStatus::Refunded;
         self.payments(payment_id).set(&p);
 
-        self.refund_event(payment_id, &payer, &amount);
+        self.refund_event(payment_id, &payer, &token, &amount);
     }
 
     // --- Views --------------------------------------------------------------
@@ -143,6 +150,7 @@ pub trait OpenClawPayments {
         #[indexed] payment_id: u64,
         #[indexed] payer: &ManagedAddress,
         #[indexed] payee: &ManagedAddress,
+        token: &TokenIdentifier,
         amount: &BigUint,
         task_id: &ManagedBuffer,
     );
@@ -152,6 +160,7 @@ pub trait OpenClawPayments {
         &self,
         #[indexed] payment_id: u64,
         #[indexed] payee: &ManagedAddress,
+        token: &TokenIdentifier,
         amount: &BigUint,
     );
 
@@ -160,6 +169,7 @@ pub trait OpenClawPayments {
         &self,
         #[indexed] payment_id: u64,
         #[indexed] payer: &ManagedAddress,
+        token: &TokenIdentifier,
         amount: &BigUint,
     );
 }
