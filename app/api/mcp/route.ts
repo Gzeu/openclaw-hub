@@ -19,33 +19,24 @@ type JsonRpcRes = {
   error?: { code: number; message: string; data?: any }
 }
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 const BASE_HEADERS = {
   'Content-Type': 'application/json',
   'X-Content-Type-Options': 'nosniff',
   'Access-Control-Allow-Origin': '*',
 }
 
-/**
- * Tool definitions — MCP Tools spec (inputSchema is JSON Schema).
- * https://modelcontextprotocol.info/specification/2024-11-05/server/tools/
- */
+// ---------------------------------------------------------------------------
+// Tool definitions (4 tools)
+// ---------------------------------------------------------------------------
 const TOOLS = [
   {
     name: 'openclaw.skills.list',
     description: 'List all skills exposed by OpenClaw Hub (GET /api/skills).',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      additionalProperties: false,
-    },
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'openclaw.skills.match',
-    description:
-      'Match a natural-language task description to the most relevant OpenClaw Hub skills (POST /api/skills).',
+    description: 'Match a natural-language task description to the most relevant OpenClaw Hub skills.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -59,31 +50,46 @@ const TOOLS = [
     name: 'openclaw.acp.build',
     description:
       'Build an unsigned MultiversX transaction (ACP — Agent Commerce Protocol). ' +
-      'Returns an unsigned tx object the caller must sign and broadcast via openclaw.acp.broadcast or POST /api/acp/broadcast. ' +
-      'Actions: transfer_egld | transfer_esdt | sc_call | pay_skill.',
+      'Actions: transfer_egld | transfer_esdt | sc_call | pay_skill. ' +
+      'Returns unsigned tx — caller must sign and broadcast via /api/acp/broadcast.',
     inputSchema: {
       type: 'object',
       properties: {
-        action: {
-          type: 'string',
-          enum: ['transfer_egld', 'transfer_esdt', 'sc_call', 'pay_skill'],
-          description: 'ACP action type.',
-        },
-        sender: { type: 'string', description: 'erd1 sender address.' },
-        receiver: { type: 'string', description: 'erd1 receiver address (transfer_egld only).' },
-        amount: { type: 'string', description: 'Amount in EGLD e.g. "0.001" (transfer_egld only).' },
-        tokenId: { type: 'string', description: 'ESDT token identifier (transfer_esdt only).' },
-        contract: { type: 'string', description: 'Smart contract erd1 address (sc_call only).' },
-        func: { type: 'string', description: 'Function name to call (sc_call only).' },
-        args: { type: 'array', items: { type: 'string' }, description: 'Hex-encoded arguments (sc_call only).' },
-        skillId: { type: 'string', description: 'Skill ID to pay for (pay_skill only).' },
-        priceEgld: { type: 'string', description: 'Price in EGLD e.g. "0.0001" (pay_skill only).' },
-        taskId: { type: 'string', description: 'Optional task correlation ID (pay_skill only).' },
-        value: { type: 'string', description: 'EGLD value to attach in raw denomination (sc_call only).' },
-        gasLimit: { type: 'number', description: 'Custom gas limit (sc_call only).' },
-        data: { type: 'string', description: 'Optional memo/data field (transfer_egld / transfer_esdt only).' },
+        action:    { type: 'string', enum: ['transfer_egld', 'transfer_esdt', 'sc_call', 'pay_skill'] },
+        sender:    { type: 'string', description: 'erd1 sender address.' },
+        receiver:  { type: 'string', description: 'erd1 receiver (transfer_egld).' },
+        amount:    { type: 'string', description: 'Amount in EGLD e.g. "0.001" (transfer_egld).' },
+        tokenId:   { type: 'string', description: 'ESDT token identifier (transfer_esdt).' },
+        contract:  { type: 'string', description: 'SC erd1 address (sc_call).' },
+        func:      { type: 'string', description: 'Function name (sc_call).' },
+        args:      { type: 'array', items: { type: 'string' }, description: 'Hex-encoded args (sc_call).' },
+        skillId:   { type: 'string', description: 'Skill ID to pay for (pay_skill).' },
+        priceEgld: { type: 'string', description: 'Price in EGLD (pay_skill).' },
+        taskId:    { type: 'string', description: 'Optional task ID (pay_skill).' },
+        value:     { type: 'string', description: 'EGLD in raw denom to attach (sc_call).' },
+        gasLimit:  { type: 'number', description: 'Custom gas limit (sc_call).' },
+        data:      { type: 'string', description: 'Memo field (transfer_egld / transfer_esdt).' },
       },
       required: ['action', 'sender'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'openclaw.defi.swap',
+    description:
+      'Build an unsigned xExchange DeFi swap transaction (ESDT token swap on MultiversX DEX). ' +
+      'Same mechanism used by Max (MultiversX autonomous agent). ' +
+      'Returns swap quote + unsigned ACP sc_call tx — caller signs and broadcasts via /api/acp/broadcast.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sender:   { type: 'string', description: 'erd1 sender address.' },
+        tokenIn:  { type: 'string', description: 'ESDT identifier to swap FROM (use WEGLD for EGLD swaps). E.g. WEGLD-bd4d79' },
+        tokenOut: { type: 'string', description: 'ESDT identifier to swap TO. E.g. MEX-455c57' },
+        amountIn: { type: 'string', description: 'Human-readable amount e.g. "0.5"' },
+        slippage: { type: 'number', description: 'Slippage tolerance % (0.1-50), default 1.' },
+      },
+      required: ['sender', 'tokenIn', 'tokenOut', 'amountIn'],
       additionalProperties: false,
     },
   },
@@ -130,18 +136,15 @@ async function proxyJson(origin: string, path: string, init?: RequestInit) {
 // ---------------------------------------------------------------------------
 export async function GET() {
   return NextResponse.json(
-    { hint: 'POST JSON-RPC 2.0. Methods: initialize | tools/list | tools/call' },
+    { hint: 'POST JSON-RPC 2.0. Methods: initialize | tools/list | tools/call', tools: TOOLS.length },
     { headers: BASE_HEADERS }
   )
 }
 
 export async function POST(req: NextRequest) {
   let body: JsonRpcReq
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json(rpcErr(null, -32700, 'Parse error'), { status: 400, headers: BASE_HEADERS })
-  }
+  try { body = await req.json() }
+  catch { return NextResponse.json(rpcErr(null, -32700, 'Parse error'), { status: 400, headers: BASE_HEADERS }) }
 
   const id = body?.id ?? null
 
@@ -154,7 +157,7 @@ export async function POST(req: NextRequest) {
 
   const origin = new URL(req.url).origin
 
-  // ── initialize ─────────────────────────────────────────
+  // ── initialize
   if (body.method === 'initialize') {
     return NextResponse.json(
       ok(id, {
@@ -166,19 +169,19 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── tools/list ────────────────────────────────────────
+  // ── tools/list
   if (body.method === 'tools/list') {
     return NextResponse.json(ok(id, { tools: TOOLS }), { headers: BASE_HEADERS })
   }
 
-  // ── tools/call ────────────────────────────────────────
+  // ── tools/call
   if (body.method === 'tools/call') {
     const name = body.params?.name
     const args = body.params?.arguments ?? {}
 
     if (name === 'openclaw.skills.list') {
       const { status, json } = await proxyJson(origin, '/api/skills')
-      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Upstream /api/skills failed', { status, body: json }), { headers: BASE_HEADERS })
+      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Upstream /api/skills failed', { status }), { headers: BASE_HEADERS })
       return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
     }
 
@@ -186,11 +189,8 @@ export async function POST(req: NextRequest) {
       if (typeof args.task !== 'string' || !args.task.trim()) {
         return NextResponse.json(rpcErr(id, -32602, 'Invalid params: task (string) is required'), { headers: BASE_HEADERS })
       }
-      const { status, json } = await proxyJson(origin, '/api/skills', {
-        method: 'POST',
-        body: JSON.stringify({ task: args.task }),
-      })
-      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Upstream POST /api/skills failed', { status, body: json }), { headers: BASE_HEADERS })
+      const { status, json } = await proxyJson(origin, '/api/skills', { method: 'POST', body: JSON.stringify({ task: args.task }) })
+      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Upstream POST /api/skills failed', { status }), { headers: BASE_HEADERS })
       return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
     }
 
@@ -198,11 +198,23 @@ export async function POST(req: NextRequest) {
       if (!args.action || !args.sender) {
         return NextResponse.json(rpcErr(id, -32602, 'Invalid params: action and sender are required'), { headers: BASE_HEADERS })
       }
-      const { status, json } = await proxyJson(origin, '/api/acp', {
+      const { status, json } = await proxyJson(origin, '/api/acp', { method: 'POST', body: JSON.stringify(args) })
+      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'ACP build failed', { status, body: json }), { headers: BASE_HEADERS })
+      return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
+    }
+
+    if (name === 'openclaw.defi.swap') {
+      if (!args.sender || !args.tokenIn || !args.tokenOut || !args.amountIn) {
+        return NextResponse.json(
+          rpcErr(id, -32602, 'Invalid params: sender, tokenIn, tokenOut, amountIn are required'),
+          { headers: BASE_HEADERS }
+        )
+      }
+      const { status, json } = await proxyJson(origin, '/api/skills/execute/defi-swap', {
         method: 'POST',
         body: JSON.stringify(args),
       })
-      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'ACP build failed', { status, body: json }), { headers: BASE_HEADERS })
+      if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'DeFi swap failed', { status, body: json }), { headers: BASE_HEADERS })
       return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
     }
 
