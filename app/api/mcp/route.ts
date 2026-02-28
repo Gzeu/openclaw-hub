@@ -26,7 +26,7 @@ const BASE_HEADERS = {
 }
 
 // ---------------------------------------------------------------------------
-// Tool definitions (4 tools)
+// Tool definitions (5 tools)
 // ---------------------------------------------------------------------------
 const TOOLS = [
   {
@@ -90,6 +90,25 @@ const TOOLS = [
         slippage: { type: 'number', description: 'Slippage tolerance % (0.1-50), default 1.' },
       },
       required: ['sender', 'tokenIn', 'tokenOut', 'amountIn'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'openclaw.agent.identity',
+    description:
+      'Get or create an OpenClaw agent on-chain identity. ' +
+      'action=get: lookup DID + NFT identity tokens for an erd1 address. ' +
+      'action=create: register a new agent identity off-chain and return the message to sign for proof-of-ownership.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action:      { type: 'string', enum: ['get', 'create'], description: 'get=lookup existing, create=new identity' },
+        address:     { type: 'string', description: 'erd1... MultiversX address of the agent.' },
+        name:        { type: 'string', description: 'Agent display name (required for create).' },
+        description: { type: 'string', description: 'Short description of the agent (create).' },
+        skills:      { type: 'array', items: { type: 'string' }, description: 'Skill IDs the agent offers (create).' },
+      },
+      required: ['action', 'address'],
       additionalProperties: false,
     },
   },
@@ -162,7 +181,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       ok(id, {
         protocolVersion: '2025-11-25',
-        serverInfo: { name: 'openclaw-hub', version: '0.2.0' },
+        serverInfo: { name: 'openclaw-hub', version: '0.3.0' },
         capabilities: { tools: { listChanged: false } },
       }),
       { headers: BASE_HEADERS }
@@ -216,6 +235,43 @@ export async function POST(req: NextRequest) {
       })
       if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'DeFi swap failed', { status, body: json }), { headers: BASE_HEADERS })
       return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
+    }
+
+    if (name === 'openclaw.agent.identity') {
+      if (!args.action || !args.address) {
+        return NextResponse.json(
+          rpcErr(id, -32602, 'Invalid params: action and address are required'),
+          { headers: BASE_HEADERS }
+        )
+      }
+      if (args.action === 'get') {
+        const { status, json } = await proxyJson(
+          origin,
+          `/api/agents/identity?address=${encodeURIComponent(args.address)}`
+        )
+        if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Identity lookup failed', { status }), { headers: BASE_HEADERS })
+        return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
+      }
+      if (args.action === 'create') {
+        if (!args.name) {
+          return NextResponse.json(
+            rpcErr(id, -32602, 'Invalid params: name is required for create'),
+            { headers: BASE_HEADERS }
+          )
+        }
+        const { status, json } = await proxyJson(origin, '/api/agents/identity', {
+          method: 'POST',
+          body: JSON.stringify({
+            address: args.address,
+            name: args.name,
+            description: args.description ?? '',
+            skills: args.skills ?? [],
+          }),
+        })
+        if (status >= 400) return NextResponse.json(rpcErr(id, -32000, 'Identity create failed', { status, body: json }), { headers: BASE_HEADERS })
+        return NextResponse.json(ok(id, { content: [{ type: 'text', text: JSON.stringify(json) }], isError: false }), { headers: BASE_HEADERS })
+      }
+      return NextResponse.json(rpcErr(id, -32602, `Unknown action: ${args.action}`), { headers: BASE_HEADERS })
     }
 
     return NextResponse.json(rpcErr(id, -32601, `Unknown tool: ${String(name)}`), { status: 404, headers: BASE_HEADERS })
