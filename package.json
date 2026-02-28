@@ -18,7 +18,11 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "@e2b/code-interpreter": "^1.0.0",
-    "@multiversx/sdk-dapp": "^4.0.0"
+    "@multiversx/sdk-dapp": "^4.0.0",
+    "@multiversx/sdk-core": "^13.1.0",
+    "@multiversx/sdk-network-providers": "^2.1.0",
+    "@multiversx/sdk-wallet": "^4.0.0",
+    "convex": "^1.11.0"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
