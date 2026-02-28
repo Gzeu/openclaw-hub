@@ -54,26 +54,12 @@ export default function WalletPage() {
   }
 
   const handleConnect = async () => {
-    try {
-      const { UnlockPanelManager } = await import(
-        '@multiversx/sdk-dapp/out/managers/UnlockPanelManager'
-      )
-      const mgr = UnlockPanelManager.init({
-        loginHandler: async ({ type, anchor }: any) => {
-          const { ProviderFactory } = await import(
-            '@multiversx/sdk-dapp/out/providers/ProviderFactory'
-          )
-          const provider = await ProviderFactory.create({ type, anchor })
-          const { address: addr } = await provider.login()
-          setAddress(addr)
-          setConnected(true)
-          lookup(addr)
-        },
-      })
-      mgr.openUnlockPanel()
-    } catch (e) {
-      console.warn('[MVX] Connect:', e)
-    }
+    // Open MultiversX web wallet for connection
+    const network = process.env.NEXT_PUBLIC_MVX_NETWORK ?? 'devnet'
+    const walletUrl = network === 'mainnet'
+      ? 'https://wallet.multiversx.com'
+      : `https://${network}-wallet.multiversx.com`
+    alert(`Please use the address lookup below to view your ${network} wallet. Direct wallet connection coming soon.`)
   }
 
   return (
@@ -97,13 +83,11 @@ export default function WalletPage() {
           </nav>
         </div>
       </header>
-
       <main className="max-w-4xl mx-auto px-6 py-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">🔗 MultiversX Wallet</h1>
           <p className="text-zinc-400">Connect your wallet or lookup any erd1 address on {process.env.NEXT_PUBLIC_MVX_NETWORK ?? 'devnet'}.</p>
         </div>
-
         {/* Connect / Search */}
         <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6 mb-8">
           <div className="flex gap-3 mb-4">
@@ -135,7 +119,6 @@ export default function WalletPage() {
             </button>
           </div>
         </div>
-
         {/* Account card */}
         {account && (
           <>
@@ -151,7 +134,6 @@ export default function WalletPage() {
                 </div>
               ))}
             </div>
-
             {/* Address */}
             <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl px-5 py-4 mb-8">
               <p className="text-xs text-zinc-500 mb-1">Address</p>
@@ -160,7 +142,6 @@ export default function WalletPage() {
                 <p className="text-xs text-[#23F7DD] mt-1">@{account.username}</p>
               )}
             </div>
-
             {/* Transactions */}
             <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-zinc-800">
