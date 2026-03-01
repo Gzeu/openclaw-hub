@@ -1,109 +1,327 @@
 # 🐾 OpenClaw Hub
 
-OpenClaw Hub is a decentralized AI orchestration platform built on the **MultiversX** blockchain. It bridges the gap between human intent, artificial intelligence, and trustless Web3 payments. 
+**OpenClaw Hub** is a centralized platform for **AI agents, skills, and decentralized economy** that seamlessly integrates **OpenClaw Embedded Agents** with a **modern web interface**.
 
-Users can fund on-chain "bounties" in EGLD or ESDT tokens (like USDC), which are held in a secure Escrow Smart Contract. AI Agents then execute the tasks (with the ability to read real-time blockchain data), and upon successful completion, the Hub automatically releases the funds to the agent. If the task fails, the funds are refunded to the user.
+The platform offers real-time chat with AI agents, dashboard analytics, and a decentralized economy system based on **EGLD on MultiversX Devnet**.
 
 ---
 
 ## 🌟 Core Features
 
-### 1. Web3 Native Dark Mode UI (Next.js)
-- **Seamless Login:** Integrated with `@multiversx/sdk-dapp` for instant connection via xPortal app, DeFi Browser Extension, or Web Wallet.
-- **Reactive Interface:** Powered by Convex, the UI updates instantly. You watch your task go from `Pending Deposit` ➡️ `Funded` ➡️ `In Progress` ➡️ `Completed` without ever refreshing the page.
-- **Agent Output Terminal:** View exactly what the AI generated directly in a clean, terminal-like UI.
+### 🤖 Embedded AI Agents
+- **3 Available Agents**: `default`, `main`, `op` with different contexts
+- **Model**: `mistral-medium-latest` (Mistral AI)
+- **Real-time Chat**: Streaming responses with WebSocket fallback
+- **Session Persistence**: Conversations permanently saved in JSON files
+- **Context Awareness**: Access to workspace, tools, and 25+ skills
 
-### 2. EGLD & ESDT Escrow Smart Contract (Rust)
-- **Multi-Token Support:** Thanks to `#[payable("*")]`, users can lock EGLD or stablecoins (USDC) for a specific task.
-- **Hub-as-Oracle:** The smart contract ensures funds are locked securely until the Hub (Owner) evaluates the task.
-- **Release/Refund:** Funds are guaranteed to be routed correctly. Successful AI tasks trigger `release` (Agent gets paid), while errors trigger `refund` (User gets their money back).
+### 📊 Dashboard Analytics
+- **Session Monitoring**: Token usage, costs, models used
+- **Chat Performance**: Response time, success rates
+- **Cost Tracking**: Full transparency of API costs
+- **Real-time Updates**: Live dashboard with streaming
 
-### 3. AI Agent Marketplace
-- **Choose Your AI:** Users aren't locked into one AI. They can select from a marketplace of specialized AI agents built by different developers.
-- **Auto-Routing Payments:** When a user selects an agent, the Smart Contract automatically maps the bounty to that specific developer's wallet address.
-- **External Framework Support:** The database schema supports `LangChain`, `Eliza`, or custom server endpoints for agent logic.
+### 🛠️ Skill Management
+- **25+ Skills**: AI/LLM, Web Search, Code, Blockchain, Data
+- **Free APIs**: OpenRouter, Groq, Gemini, Tavily, etc.
+- **Easy Integration**: Standardized API endpoints
+- **Custom Skills**: Ability to add new skills
 
-### 4. Event-Driven Backend (Convex)
-- **Blockchain Watcher:** A background Cron Job continuously polls the MultiversX API. Once it confirms a user's deposit transaction is minted on the blockchain, it safely triggers the AI agent.
-- **Secure Signing:** The backend securely holds the Hub's private key via environment variables, signing the `release`/`refund` transactions autonomously.
+### 💰 Decentralized Economy
+- **Cryptocurrency**: EGLD (MultiversX Devnet)
+- **Pricing**: Per-task (pay only for what you use)
+- **Transparency**: Costs monitored in real-time
+- **Smart Contracts**: MultiversX integration
+
+### 🌐 Modern Web Interface
+- **Next.js 14**: React, TypeScript, TailwindCSS
+- **Responsive Design**: Mobile-first approach
+- **Real-time Updates**: WebSocket streaming
+- **Modern UI Components**: Card, Button, Input, etc.
 
 ---
 
-## 🛠️ System Architecture Flow
+## 🚀 Quick Start
 
-1. **User Request:** User selects an Agent from the Marketplace, writes a prompt, and assigns a bounty.
-2. **Deposit:** User signs the TX via xPortal. Tokens are locked in the Smart Contract.
-3. **Validation:** Convex Cron Job verifies the TX on the MultiversX blockchain and extracts the exact `Payment ID`.
-4. **Execution:** The AI Agent is triggered. It reads the prompt, decides if it needs to use MultiversX tools (like `getAccountBalance`), fetches data, and generates the final output.
-5. **Settlement:** 
-   - *Success:* Convex backend signs the `release` TX. Agent receives the tokens.
-   - *Failure:* Convex backend signs the `refund` TX. User receives tokens back.
+### 1. Installation
+```bash
+git clone https://github.com/Gzeu/openclaw-hub
+cd openclaw-hub
+npm install
+```
+
+### 2. OpenClaw Setup
+```bash
+# Install OpenClaw
+npm install -g openclaw
+
+# Configure workspace
+openclaw init
+
+# Check agents
+openclaw agents list
+```
+
+### 3. Start Platform
+```bash
+# Start development server
+npm run dev
+
+# Access platform
+# http://localhost:3000
+```
+
+---
+
+## 🌐 API Endpoints
+
+### Chat & Agents
+```bash
+# Chat with agent
+POST /api/agents/chat
+{
+  "sessionKey": "agent:default:main",
+  "message": "What can you do?"
+}
+
+# List agents
+GET /api/agents
+
+# Chat history
+GET /api/chat/history/[sessionKey]
+```
+
+### Dashboard Analytics
+```bash
+# Active sessions
+GET /api/dashboard/sessions
+
+# Costs and usage
+GET /api/dashboard/costs
+
+# Chat performance
+GET /api/dashboard/chat
+```
+
+### Skills & Integration
+```bash
+# Complete skills list
+GET /api/skills
+
+# Compact manifest
+GET /api/skills?format=compact
+
+# Health check
+GET /api/health
+```
+
+---
+
+## 🤖 Agent Capabilities
+
+### Default Agent
+- **General Purpose**: System context and general responses
+- **Skills Integration**: Access to all 25+ skills
+- **Real-time Data**: Monitoring and status updates
+
+### Main Agent
+- **Development Focus**: Coding, debugging, and development tasks
+- **Git Integration**: Repository management and code analysis
+- **Project Management**: Task tracking and workflow automation
+
+### OP Agent
+- **Operations Focus**: Monitoring, alerts, and system management
+- **Crypto Integration**: Binance, Bybit, and blockchain monitoring
+- **Analytics**: Performance tracking and reporting
+
+---
+
+## 📊 Session Management
+
+### Persistence System
+- **File Storage**: `sessions.json` for persistence
+- **Auto-save**: On every message sent/received
+- **Load on Startup**: Restore conversations on restart
+- **Multi-agent**: Each agent with separate history
+
+### Chat History
+```typescript
+// Hook for UI integration
+const { messages, isLoading, addMessage } = useChatHistory('agent:default:main')
+```
+
+---
+
+## 🛠️ Architecture
+
+### Frontend (Next.js 14)
+- **Modern UI**: React, TypeScript, TailwindCSS
+- **Real-time Chat**: WebSocket + Streaming
+- **Dashboard**: Analytics and monitoring
+- **Responsive**: Mobile-first design
+
+### Backend (Node.js)
+- **API Routes**: REST endpoints for all functionality
+- **Session Management**: Conversation persistence
+- **Agent Integration**: OpenClaw Embedded Agent CLI
+- **File Storage**: JSON-based session persistence
+
+### OpenClaw Integration
+- **Embedded Agent**: `npx openclaw agent --local`
+- **Workspace Access**: `C:\Users\el\.openclaw\workspace`
+- **Skills System**: 25+ predefined skills
+- **Tool Integration**: Read, Edit, Exec, Browser, etc.
 
 ---
 
 ## 📋 Requirements
 
-To run, develop, or deploy OpenClaw Hub, you must meet the following requirements:
+### System Requirements
+- **Node.js**: Version 18.x or newer
+- **OpenClaw CLI**: Required for embedded agent functionality
+- **Git**: For version control and deployment
 
-### Smart Contract / Blockchain
-- **Rust Toolchain:** Version `1.75.0` or newer.
-- **MultiversX CLI (`mxpy`):** Required to build and deploy the smart contract.
-- **Target Network:** MultiversX Devnet (Chain ID: `D`).
-
-### Frontend & Backend
-- **Node.js:** Version `18.x` or newer.
-- **Convex Account:** A free account on [Convex.dev](https://convex.dev/).
-- **OpenRouter API Key:** Required for the default LLM (Claude 3 Haiku).
+### OpenClaw Setup
+- **Workspace**: `C:\Users\el\.openclaw\workspace`
+- **Configuration**: `openclaw.json` with model settings
+- **Skills**: Available in `workspace\skills\` directory
 
 ---
 
-## 🚀 How to Run Locally
+## 🔧 Configuration
 
-### 1. Deploy the Smart Contract
-```bash
-cd contracts/openclaw-payments
-mxpy wallet new --format pem --outfile devnet.pem 
-chmod +x deploy-devnet.sh
-./deploy-devnet.sh
+### OpenClaw Configuration
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "mistral/mistral-medium-latest",
+        "fallbacks": ["mistral/mistral-medium-latest"]
+      }
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "test-token"
+    }
+  }
+}
 ```
-*Save the resulting Smart Contract address.*
 
-### 2. Configure Environment Variables
-**A. In your Convex Dashboard (Settings -> Environment Variables):**
-- `OPENROUTER_API_KEY` = Your OpenRouter API key.
-- `HUB_PRIVATE_KEY` = The HEX private key of the wallet you used to deploy the contract.
+### Environment Variables
+```bash
+# OpenClaw workspace
+OPENCLAW_WORKSPACE="C:\\Users\\el\\.openclaw\\workspace"
 
-**B. In your local `.env.local` file:**
-```env
-NEXT_PUBLIC_CONVEX_URL="your-convex-dev-url"
-NEXT_PUBLIC_SC_ADDRESS="erd1qqqqqq..." # Address from step 1
+# Gateway configuration
+GATEWAY_URL="ws://127.0.0.1:18789"
+GATEWAY_TOKEN="test-token"
 ```
 
-### 3. Start the Application
-Install dependencies and run:
+---
+
+## 📊 Available Skills
+
+| Category | Skills | Free APIs used |
+|---|---|---|
+| AI / LLM | `llm-complete`, `llm-stream`, `embedded-chat` | OpenRouter, Groq, Gemini, Mistral |
+| Web Search | `web-search`, `news-search` | Tavily, Brave, DuckDuckGo |
+| Web Scraping | `scrape-url`, `extract-content` | Jina Reader, Firecrawl |
+| Code | `code-execute`, `code-analyze`, `repo-search` | E2B, GitHub API |
+| Blockchain | `mvx-balance`, `mvx-txns`, `price-feed` | MultiversX, CoinGecko |
+| Data | `weather`, `wiki-search` | Open-Meteo, Wikipedia |
+| Memory | `memory-store`, `memory-search` | Upstash, Qdrant |
+
+---
+
+## 🚀 Usage Examples
+
+### Chat with Agent
 ```bash
+curl -X POST http://localhost:3000/api/agents/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionKey": "agent:default:main",
+    "message": "What are you doing now?"
+  }'
+```
+
+### Dashboard Analytics
+```bash
+# Session monitoring
+curl http://localhost:3000/api/dashboard/sessions
+
+# Costs and usage
+curl http://localhost:3000/api/dashboard/costs
+```
+
+### Skill Integration
+```bash
+# Available skills
+curl http://localhost:3000/api/skills
+
+# Integration manifest
+curl http://localhost:3000/api/skills?format=compact
+```
+
+---
+
+## 🤝 Contributing
+
+### Development
+```bash
+# Install dependencies
 npm install
+
+# Start development
 npm run dev
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
 ```
 
-Open another terminal to sync the database:
-```bash
-npx convex dev
-```
-
-*Note: On first load, the app will automatically seed the database with the "OpenClaw Base Agent" so you can start testing immediately.*
+### Contributing Guide
+1. Fork repository
+2. Create feature branch
+3. Make changes
+4. Add tests
+5. Submit pull request
 
 ---
 
-## 🤖 Adding an External Agent to the Marketplace
+## 📄 License
 
-If you are a developer and want to plug your own Python/Rust agent into OpenClaw:
-1. Host your agent on your own server (e.g., exposing an API endpoint).
-2. Call the `registerAgent` Convex mutation with your agent's details:
-   - `name`: "My Super Bot"
-   - `walletAddress`: "erd1yourwallet..." (Where you want to get paid)
-   - `endpointUrl`: "https://api.mybot.com/webhook"
-3. Modify the Hub's `agent.ts` action to send an HTTP POST to your `endpointUrl` instead of calling OpenRouter directly when your agent is selected.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
-*Built for the MultiversX Ecosystem.*
+
+## 🔗 Useful Links
+
+- **GitHub**: https://github.com/Gzeu/openclaw-hub
+- **Issues**: https://github.com/Gzeu/openclaw-hub/issues
+- **Documentation**: http://localhost:3000/skill.md
+- **API Reference**: http://localhost:3000/api/skills
+- **OpenClaw**: https://github.com/openclaw-d
+
+---
+
+## 🎉 Conclusion
+
+**OpenClaw Hub** is a complete, production-ready platform for:
+- **AI Agent Development**: With OpenClaw integration
+- **Real-time Chat**: With session persistence
+- **Dashboard Analytics**: For monitoring and costs
+- **Skill Management**: With 25+ predefined skills
+- **Decentralized Economy**: With EGLD on MultiversX
+
+**The platform is ready for production and can be extended with new features!** 🚀
+
+---
+
+*Built with ❤️ using OpenClaw, Next.js, and MultiversX*
