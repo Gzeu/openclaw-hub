@@ -65,6 +65,8 @@ function saveSessions() {
   }
 }
 
+import { sessionManager } from './session-manager'
+
 // Load sessions on startup
 loadSessions()
 
@@ -75,6 +77,31 @@ export function getSessionHistory(sessionKey: string): any[] {
 export function clearSession(sessionKey: string): void {
   agentSessions.delete(sessionKey)
   saveSessions() // Save after clearing
+  
+  // Also try to clear OpenClaw session lock files
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const sessionDir = 'C:\\Users\\el\\.openclaw\\agents\\default\\sessions'
+    
+    // Find and remove lock files
+    if (fs.existsSync(sessionDir)) {
+      const files = fs.readdirSync(sessionDir)
+      files.forEach((file: string) => {
+        if (file.endsWith('.lock')) {
+          const lockPath = path.join(sessionDir, file)
+          try {
+            fs.unlinkSync(lockPath)
+            console.log(`Removed lock file: ${lockPath}`)
+          } catch (error) {
+            console.log(`Could not remove lock file: ${lockPath}`)
+          }
+        }
+      })
+    }
+  } catch (error) {
+    console.log('Could not clear OpenClaw session locks:', error)
+  }
 }
 
 export function getAllSessions(): Map<string, any[]> {
@@ -238,6 +265,17 @@ async function sendViaEmbeddedAgent(
   sessionKey: string,
   text: string
 ): Promise<ReadableStream<Uint8Array>> {
+  // Auto-unlock stuck sessions before attempting to send
+  try {
+    const stuckLocks = await sessionManager.getStuckLocks(2) // 2 minutes threshold
+    if (stuckLocks.length > 0) {
+      console.log(`Found ${stuckLocks.length} stuck session locks, auto-unlocking...`)
+      await sessionManager.autoUnlockStuckSessions(2)
+    }
+  } catch (error) {
+    console.log('Auto-unlock check failed:', error)
+  }
+
   return new Promise((resolve, reject) => {
     const { spawn } = require('child_process')
     
@@ -251,10 +289,13 @@ async function sendViaEmbeddedAgent(
       timestamp: new Date().toISOString()
     })
     
+    // Escape the message properly for shell - wrap in quotes
+    const escapedMessage = `"${text.replace(/"/g, '\\"').replace(/`/g, '\\`')}"`
+    
     const args = [
       'agent',
       '--agent', sessionKey.split(':')[1] || 'main',
-      '--message', `"${text}"`,
+      '--message', escapedMessage,
       '--json',
       '--local'
     ]

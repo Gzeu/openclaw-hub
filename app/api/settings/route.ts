@@ -2,6 +2,59 @@ import { NextRequest, NextResponse } from 'next/server'
 import { writeFileSync, readFileSync } from 'fs'
 import { join } from 'path'
 
+// Get current settings
+export async function GET() {
+  try {
+    // Read current .env file
+    const envPath = join(process.cwd(), '.env')
+    let envContent = ''
+    
+    try {
+      envContent = readFileSync(envPath, 'utf-8')
+    } catch (error) {
+      // .env file doesn't exist, return defaults
+    }
+    
+    // Parse environment variables
+    const gatewayToken = envContent.match(/OPENCLAW_GATEWAY_TOKEN=(.+)/)?.[1] || 'test-token'
+    const gatewayUrl = envContent.match(/OPENCLAW_GATEWAY_URL=(.+)/)?.[1] || 'ws://127.0.0.1:18789'
+    
+    return NextResponse.json({
+      success: true,
+      settings: {
+        gateway: {
+          token: gatewayToken,
+          url: gatewayUrl
+        },
+        openclaw: {
+          workspace: 'C:\\Users\\el\\.openclaw',
+          agent: {
+            defaultModel: 'mistral/mistral-medium-latest',
+            timeout: 30000
+          }
+        },
+        features: {
+          embeddedAgents: true,
+          sessionPersistence: true,
+          dashboardAnalytics: true,
+          skillManagement: true,
+          realTimeChat: true
+        }
+      },
+      metadata: {
+        version: '0.3.0',
+        lastUpdated: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+      }
+    })
+  } catch (error: any) {
+    return NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { gatewayToken, gatewayUrl } = await request.json()

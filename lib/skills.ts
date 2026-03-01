@@ -405,11 +405,96 @@ export const SKILLS: Skill[] = [
     agentTypes: ['utility', 'general'],
     version: '1.0.0',
   },
+  {
+    id: 'tools-status',
+    name: 'Tools Status Monitor',
+    description: 'Check health and status of all integrated APIs and tools in OpenClaw Hub',
+    category: 'utility',
+    inputs: [
+      { name: 'mode', type: 'string', required: false, description: 'Check mode: cached, live, or specific API', example: 'cached' },
+      { name: 'apiId', type: 'string', required: false, description: 'Specific API ID to check', example: 'openrouter' }
+    ],
+    outputs: [
+      { name: 'results', type: 'array', description: 'Array of API health check results' },
+      { name: 'summary', type: 'object', description: 'Summary statistics and status overview' }
+    ],
+    apiIds: ['internal'],
+    example: { endpoint: '/api/skills/tools-status?mode=cached', method: 'GET' },
+    costEstimate: 'free',
+    avgLatencyMs: 500,
+    agentTypes: ['utility', 'general', 'monitoring'],
+    version: '1.0.0',
+  },
+  {
+    id: 'available-tools',
+    name: 'Available Tools Discovery',
+    description: 'Get complete list of all available tools, APIs, and their current status with filtering options',
+    category: 'utility',
+    inputs: [
+      { name: 'mode', type: 'string', required: false, description: 'Data mode: cached or fresh check', example: 'cached' },
+      { name: 'category', type: 'string', required: false, description: 'Filter by category: Search, Scraping, Data, Blockchain, Code, Utility', example: 'blockchain' },
+      { name: 'status', type: 'string', required: false, description: 'Filter by status: ok, error, degraded, unconfigured', example: 'ok' }
+    ],
+    outputs: [
+      { name: 'results', type: 'array', description: 'Array of all available tools with their status' },
+      { name: 'grouped', type: 'object', description: 'Tools grouped by category' },
+      { name: 'summary', type: 'object', description: 'Statistics summary (total, ok, error, etc.)' }
+    ],
+    apiIds: ['internal'],
+    example: { endpoint: '/api/skills/available-tools?mode=cached', method: 'GET' },
+    costEstimate: 'free',
+    avgLatencyMs: 300,
+    agentTypes: ['utility', 'general', 'monitoring', 'discovery'],
+    version: '1.0.0',
+  },
+  {
+    id: 'agent-tools',
+    name: 'Agent Tools Suite',
+    description: 'Complete suite of 17 agent tools: file management, command execution, web interaction, sessions, automation, messaging, gateway, and memory',
+    category: 'utility',
+    inputs: [
+      { name: 'category', type: 'string', required: false, description: 'Filter by category: file_management, command_execution, web_interaction, agent_sessions, automation, messaging, gateway_management, memory', example: 'file_management' },
+      { name: 'toolId', type: 'string', required: false, description: 'Specific tool ID to execute: read, write, edit, exec, process, web_search, web_fetch, browser, sessions_spawn, sessions_list, sessions_send, subagents, cron, message, gateway, memory_search, memory_get', example: 'exec' },
+      { name: 'parameters', type: 'object', required: false, description: 'Parameters for the specific tool', example: '{"command": "curl http://localhost:3000/api/health"}' }
+    ],
+    outputs: [
+      { name: 'tools', type: 'object', description: 'Complete tools catalog organized by category' },
+      { name: 'summary', type: 'object', description: 'Statistics and overview of available tools' },
+      { name: 'usage_examples', type: 'array', description: 'Real-world usage examples and workflows' },
+      { name: 'execution', type: 'object', description: 'Tool execution result (when using POST)' }
+    ],
+    apiIds: ['internal'],
+    example: { endpoint: '/api/skills/agent-tools', method: 'GET' },
+    costEstimate: 'free',
+    avgLatencyMs: 200,
+    agentTypes: ['utility', 'general', 'automation', 'orchestration'],
+    version: '1.0.0',
+  },
+  {
+    id: 'session-manager',
+    name: 'Session Manager',
+    description: 'Monitor and manage OpenClaw agent sessions: detect stuck locks, auto-unlock sessions, cleanup old locks',
+    category: 'utility',
+    inputs: [
+      { name: 'action', type: 'string', required: true, description: 'Action: status, check, auto-unlock, force-unlock, cleanup', example: 'status' },
+      { name: 'sessionKey', type: 'string', required: false, description: 'Specific session key for check/unlock actions', example: 'agent:default:main' },
+      { name: 'maxAgeMinutes', type: 'number', required: false, description: 'Maximum age in minutes for auto-unlock', example: 5 },
+      { name: 'maxAgeHours', type: 'number', required: false, description: 'Maximum age in hours for cleanup', example: 24 }
+    ],
+    outputs: [
+      { name: 'stuckLocks', type: 'array', description: 'List of stuck session locks with age and PID info' },
+      { name: 'unlocked', type: 'number', description: 'Number of sessions auto-unlocked' },
+      { name: 'cleaned', type: 'number', description: 'Number of old lock files cleaned up' },
+      { name: 'isLocked', type: 'boolean', description: 'Whether a specific session is locked' }
+    ],
+    apiIds: ['internal'],
+    example: { endpoint: '/api/skills/session-manager?action=status', method: 'GET' },
+    costEstimate: 'free',
+    avgLatencyMs: 300,
+    agentTypes: ['utility', 'monitoring', 'automation'],
+    version: '1.0.0',
+  },
 ];
-
-// ────────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ────────────────────────────────────────────────────────────────────────────────
 
 export function getSkillById(id: string): Skill | undefined {
   return SKILLS.find((s) => s.id === id);
