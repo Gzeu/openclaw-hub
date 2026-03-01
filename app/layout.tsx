@@ -45,6 +45,7 @@ const NAV_LINKS = [
   { href: '/analyst',     label: 'Analyst',     icon: '🧠' },
   { href: '/skills',      label: 'Skills',      icon: '⚡' },
   { href: '/tools',       label: 'Tools',       icon: '🛠️' },
+  { href: '/settings',    label: 'Settings',    icon: '⚙️' },
   { href: '/qa',          label: 'FAQ',         icon: '💬' },
 ];
 

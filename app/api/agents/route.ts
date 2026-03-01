@@ -1,48 +1,53 @@
 import { NextResponse } from 'next/server'
-import { listSessions } from '@/lib/openclaw-gateway'
+import { listSessions, checkGatewayStatus, getAllAgents } from '@/lib/openclaw-gateway'
 import { fetchRegisteredAgents } from '@/lib/multiversx'
 
 export const runtime = 'nodejs'
 
 export async function GET() {
   try {
-    // Merge OpenClaw gateway sessions + MultiversX registry
-    const [sessions, registrations] = await Promise.allSettled([
-      listSessions(),
-      fetchRegisteredAgents(),
-    ])
-
-    const gwSessions = sessions.status === 'fulfilled' ? sessions.value : []
-    const mvxAgents = registrations.status === 'fulfilled' ? registrations.value : []
-
-    // Merge by agentId / sessionKey
-    const agents = gwSessions.map((session) => {
-      const mvx = mvxAgents.find((a) => a.agentId === session.key)
+    // Check if Gateway is running
+    const gatewayOnline = await checkGatewayStatus()
+    
+    if (!gatewayOnline) {
+      return NextResponse.json({ 
+        agents: [],
+        gatewayOnline: false,
+        error: 'Gateway is not running'
+      })
+    }
+    
+    // Get all available agents from OpenClaw
+    const openclawAgents = await getAllAgents()
+    
+    // Get registered agents from MultiversX
+    const registrations = await fetchRegisteredAgents()
+    
+    // Merge OpenClaw agents with MultiversX registry
+    const agents = openclawAgents.map((agent) => {
+      const mvx = registrations.find((a) => a.agentId === agent.id)
       return {
-        ...session,
+        key: agent.sessionKey,
+        label: `${agent.name} (${agent.id})`,
+        agentId: agent.id,
         address: mvx?.address ?? null,
-        capabilities: mvx?.capabilities ?? [],
-        pricePerTask: mvx?.pricePerTask ?? null,
+        capabilities: mvx?.capabilities ?? ['chat', 'web', 'data-analysis'],
+        pricePerTask: mvx?.pricePerTask ?? 0.001,
         online: true,
+        sessionKey: agent.sessionKey
       }
     })
 
-    // Add MVX-registered agents not yet connected to Gateway
-    for (const mvx of mvxAgents) {
-      if (!agents.find((a) => a.key === mvx.agentId)) {
-        agents.push({
-          key: mvx.agentId,
-          label: mvx.agentId,
-          address: mvx.address,
-          capabilities: mvx.capabilities,
-          pricePerTask: mvx.pricePerTask ?? null,
-          online: false,
-        })
-      }
-    }
-
-    return NextResponse.json({ agents })
+    return NextResponse.json({ 
+      agents,
+      gatewayOnline: true,
+      totalAgents: agents.length
+    })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    return NextResponse.json({ 
+      error: err.message,
+      gatewayOnline: false,
+      agents: []
+    }, { status: 500 })
   }
 }
