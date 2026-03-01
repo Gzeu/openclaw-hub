@@ -35,6 +35,11 @@ export function middleware(request: NextRequest) {
   const agentsApiKey = process.env.AGENTS_API_KEY ?? '';
   const isDev        = process.env.NODE_ENV === 'development';
 
+  // In development, allow all requests without authentication
+  if (isDev) {
+    return NextResponse.next();
+  }
+
   // If neither secret is configured:
   //   • Development — let the request through so developers can test without config
   //   • Production  — return 503 instead of crashing or silently returning 401

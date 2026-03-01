@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { api } from '@/lib/api-client'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Agent {
@@ -241,7 +242,7 @@ export default function AgentsPage() {
     const load = async () => {
       setAgentsLoading(true)
       try {
-        const res = await fetch('/api/agents')
+        const res = await api.getAgents()
         const data = await res.json()
         setAgents(data.agents ?? [])
         if (data.agents?.length > 0 && !selectedAgent) {
@@ -258,24 +259,14 @@ export default function AgentsPage() {
     return () => clearInterval(iv)
   }, [])
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  // ── Chat ─────────────────────────────────────────────────────────────────
-  const sendMessage = async () => {
-    if (!input.trim() || !selectedAgent || chatLoading) return
-    const text = input.trim()
-    setInput('')
-    const userMsg: ChatMsg = { role: 'user', text, ts: new Date().toISOString() }
+  // ── Chat handler ─────────────────────────────────────────────────────────────
+  const send = async () => {
+    if (!selectedAgent || !input.trim()) return
+    const userMsg = { role: 'user' as const, text: input, ts: new Date().toISOString() }
     setMessages((m) => [...m, userMsg])
     setChatLoading(true)
     try {
-      const res = await fetch('/api/agents/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionKey: selectedAgent.key, text }),
-      })
+      const res = await api.chatWithAgent(selectedAgent.key, input)
       const reader = res.body?.getReader()
       if (!reader) throw new Error('No stream')
       let full = ''
@@ -298,7 +289,12 @@ export default function AgentsPage() {
     } finally {
       setChatLoading(false)
     }
+    setInput('')
   }
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   // ── Sandbox ───────────────────────────────────────────────────────────────
   const runSandbox = async () => {
@@ -493,7 +489,7 @@ export default function AgentsPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) =>
-                  e.key === 'Enter' && !e.shiftKey && sendMessage()
+                  e.key === 'Enter' && !e.shiftKey && send()
                 }
                 placeholder={
                   selectedAgent
@@ -504,7 +500,7 @@ export default function AgentsPage() {
                 className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors disabled:opacity-40"
               />
               <button
-                onClick={sendMessage}
+                onClick={send}
                 disabled={!selectedAgent || !input.trim() || chatLoading}
                 className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
               >

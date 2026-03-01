@@ -80,26 +80,18 @@ skills, endpoints, and capabilities.
 
 ## New Features
 
-### 🤖 OpenClaw Integration
-- **Embedded Agents**: 3 agenți disponibili (default, main, op)
-- **Session Persistence**: Conversații salvate permanent în fișiere
-- **Real-time Chat**: Streaming responses cu WebSocket fallback
-- **Multi-Agent Support**: Fiecare agent cu personalitate și context propriu
-- **Memory System**: Istoric conversații cu timestamps și role management
+### 🤖 Embedded Agent Chat
+- **Model**: `mistral-medium-latest`
+- **Provider**: Mistral
+- **Endpoint**: `POST /api/agents/chat`
+- **Streaming**: Real-time response streaming
+- **Agents**: `agent:main:main`
 
-### � OpenClaw Features
-- **Agent Dashboard**: Monitorizare sesiuni și performanță
-- **Skill Management**: 25+ skills disponibile pentru diverse task-uri
-- **Cost Tracking**: Token usage și API cost monitoring
-- **Session Management**: Persistență conversații între restart-uri
-- **Gateway Integration**: Suport pentru OpenClaw Gateway (WebSocket/HTTP)
-
-### 📊 Agent Capabilities
-- **Default Agent**: General purpose cu context de sistem
-- **Main Agent**: Development și coding focus
-- **OP Agent**: Operations și monitoring specializat
-- **Context Awareness**: Acces la workspace, tools, și skills
-- **Real-time Responses**: Răspunsuri optimizate cu caching
+### 📊 Dashboard Analytics
+- **Session Analytics**: Token usage, costs, model distribution
+- **Chat Performance**: Response times, success rates
+- **Cost Monitoring**: Real-time cost tracking
+- **Endpoints**: `/api/dashboard/*`
 
 ### 🔌 API Endpoints
 - **Skills**: `GET /api/skills`
