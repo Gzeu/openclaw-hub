@@ -94,7 +94,10 @@ OPENCLAW_GATEWAY_URL=https://your-openclaw-gateway.com
 OPENCLAW_PRIVATE_KEY=your-openclaw-private-key
 
 # Literouter API Key (for Chat)
-LITEROUTER_API_KEY=57d9af92d7e95ebb9e93facc1ac54a059a38990d1607c1d4c584de10363ca7ec
+LITEROUTER_API_KEY=your-literouter-api-key-here
+
+# Note: Get your free API key from https://literouter.ai
+# The platform includes 12+ free models for unlimited usage
 ```
 
 ### 4. Start Development Server
