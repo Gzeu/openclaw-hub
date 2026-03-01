@@ -5,10 +5,10 @@ export const runtime = 'nodejs'
 
 export async function GET(
   request: Request,
-  { params }: { params: { sessionKey: string } }
+  { params }: { params: Promise<{ sessionKey: string }> }
 ) {
   try {
-    const { sessionKey } = params
+    const { sessionKey } = await params
     const history = getSessionHistory(sessionKey)
     
     return NextResponse.json({ 
@@ -26,10 +26,10 @@ export async function GET(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { sessionKey: string } }
+  { params }: { params: Promise<{ sessionKey: string }> }
 ) {
   try {
-    const { sessionKey } = params
+    const { sessionKey } = await params
     const { clearSession } = await import('@/lib/openclaw-gateway')
     clearSession(sessionKey)
     

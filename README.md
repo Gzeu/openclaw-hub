@@ -1,43 +1,65 @@
-# 🐾 OpenClaw Hub
+# 🦾 OpenClaw Hub
 
 **OpenClaw Hub** is a centralized platform for **AI agents, skills, and decentralized economy** that seamlessly integrates **OpenClaw Embedded Agents** with a **modern web interface**.
 
-The platform offers real-time chat with AI agents, dashboard analytics, and a decentralized economy system based on **EGLD on MultiversX Devnet**.
+The platform offers real-time agent communications, AI chat with multiple models, configuration management, and a decentralized economy system based on **EGLD on MultiversX Devnet**.
 
 ---
 
 ## 🌟 Core Features
 
-### 🤖 Embedded AI Agents
-- **3 Available Agents**: `default`, `main`, `op` with different contexts
-- **Model**: `mistral-medium-latest` (Mistral AI)
-- **Real-time Chat**: Streaming responses with WebSocket fallback
-- **Session Persistence**: Conversations permanently saved in JSON files
-- **Context Awareness**: Access to workspace, tools, and 25+ skills
+### 🔐 User Authentication & Account System
+- **Secure Login/Register**: Email/password with JWT tokens
+- **User Profiles**: Avatar, name, role management
+- **Session Management**: HTTP-only cookies with expiration
+- **Role-based Access**: User, Operator, Admin roles
+- **Password Security**: bcryptjs hashing with salt rounds 10
 
-### 📊 Dashboard Analytics
-- **Session Monitoring**: Token usage, costs, models used
-- **Chat Performance**: Response time, success rates
-- **Cost Tracking**: Full transparency of API costs
-- **Real-time Updates**: Live dashboard with streaming
+### 💬 AI Chat Interface
+- **Real-time Chat**: Modern chat interface with multiple AI models
+- **Literouter Integration**: 12+ models including Aurora Alpha, Ernie 4.5, Gemini, Gemma, Qwen
+- **Model Categories**: General, Reasoning, Coding, Conversational, Planning, Heavy
+- **Context Management**: Unlimited context handling with Aurora Alpha
+- **Model Switching**: Dynamic model selection during conversations
+- **Chat Export**: Download conversations in JSON format
+- **OpenClaw Context**: Each model has OpenClaw-specific context for agent integration
 
-### 🛠️ Skill Management
-- **25+ Skills**: AI/LLM, Web Search, Code, Blockchain, Data
-- **Free APIs**: OpenRouter, Groq, Gemini, Tavily, etc.
-- **Easy Integration**: Standardized API endpoints
-- **Custom Skills**: Ability to add new skills
+### 🤖 Agent Communications
+- **Real-time Chat**: WebSocket streaming with fallback
+- **Agent Delegations**: Task delegation between agents
+- **Message History**: Persistent conversation storage
+- **Status Tracking**: Online/offline/busy agent status
+- **Channel Management**: Multi-agent communication channels
 
-### 💰 Decentralized Economy
-- **Cryptocurrency**: EGLD (MultiversX Devnet)
-- **Pricing**: Per-task (pay only for what you use)
-- **Transparency**: Costs monitored in real-time
-- **Smart Contracts**: MultiversX integration
+### 📊 Configuration Management
+- **User Settings**: Theme, language, notifications, privacy, performance
+- **API Key Management**: Encrypted storage for AI providers
+- **Provider Registry**: AI providers with models and pricing
+- **Model Registry**: Detailed model capabilities and costs
+- **Provider Configuration**: Custom API endpoints and settings
 
-### 🌐 Modern Web Interface
-- **Next.js 14**: React, TypeScript, TailwindCSS
-- **Responsive Design**: Mobile-first approach
-- **Real-time Updates**: WebSocket streaming
-- **Modern UI Components**: Card, Button, Input, etc.
+### 🛠️ Task Execution Pipeline
+- **Task Queue Management**: Priority-based task queuing
+- **Status Tracking**: Real-time task status updates
+- **Result Storage**: Persistent result storage and retrieval
+- **Retry Logic**: Exponential backoff for failed tasks
+- **Task Dependencies**: Task chaining and workflow automation
+
+### 🤖 Activity Logging System
+- **Real-time Feed**: Live activity monitoring
+- **Audit Trails**: Complete action logging
+- **Performance Metrics**: Response time and success rates
+- **Error Logging**: Stack traces and debug information
+- **Filterable Views**: By type, agent, status, time range
+
+### ⚙️ Settings & Preferences UI
+- **User Dashboard**: Personalized configuration panels
+- **Theme Management**: Dark/light/auto themes
+- **Language Support**: Multi-language localization
+- **Notification Settings**: Email, push, task updates, system alerts
+- **Privacy Controls**: Data sharing, analytics, public profile
+- **Performance Settings**: Auto-save interval, cache size optimization
+- **Drag-Drop Interface**: Intuitive configuration panels
 
 ---
 
@@ -50,69 +72,151 @@ cd openclaw-hub
 npm install
 ```
 
-### 2. OpenClaw Setup
+### 2. Environment Setup
 ```bash
-# Install OpenClaw
-npm install -g openclaw
+# Copy environment variables
+cp .env.example .env.local
 
-# Configure workspace
-openclaw init
-
-# Check agents
-openclaw agents list
+# Configure Convex
+npx convex dev
 ```
 
-### 3. Start Platform
-```bash
-# Start development server
-npm run dev
+### 3. Environment Variables
+```env
+# Convex Configuration
+NEXT_PUBLIC_CONVEX_URL=https://your-convex-url.convex.cloud
 
-# Access platform
-# http://localhost:3000
+# JWT Secret
+JWT_SECRET=your-super-secret-jwt-key
+
+# OpenClaw Gateway (Optional)
+OPENCLAW_GATEWAY_URL=https://your-openclaw-gateway.com
+OPENCLAW_PRIVATE_KEY=your-openclaw-private-key
+
+# Literouter API Key (for Chat)
+LITEROUTER_API_KEY=57d9af92d7e95ebb9e93facc1ac54a059a38990d1607c1d4c584de10363ca7ec
+```
+
+### 4. Start Development Server
+```bash
+npm run dev
+```
+
+### 5. Access the Platform
+- **🌐 Open**: http://localhost:3000
+- **🔐 Login**: Sign in with `test@example.com` / `password123`
+- **💬 Chat**: Start chatting with AI models
+- **⚙️ Configure**: Manage settings and API keys
+- **🤖 Agents**: Explore agent communications
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables
+```bash
+# Convex Backend
+NEXT_PUBLIC_CONVEX_URL="https://chatty-eagle-75.eu-west-1.convex.cloud"
+
+# Authentication
+JWT_SECRET="your-jwt-secret-key-here"
+
+# OpenClaw Gateway (optional)
+OPENCLAW_GATEWAY_URL="ws://127.0.0.1:18789"
+OPENCLAW_GATEWAY_TOKEN="test-token"
 ```
 
 ---
 
 ## 🌐 API Endpoints
 
-### Chat & Agents
+### Authentication
 ```bash
-# Chat with agent
-POST /api/agents/chat
+# Register user
+POST /api/auth/register
 {
-  "sessionKey": "agent:default:main",
-  "message": "What can you do?"
+  "email": "user@example.com",
+  "name": "John Doe",
+  "password": "password123",
+  "role": "user"
 }
 
-# List agents
-GET /api/agents
+# Login user
+POST /api/auth/login
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
 
-# Chat history
-GET /api/chat/history/[sessionKey]
+# Get current user
+GET /api/auth/me
 ```
 
-### Dashboard Analytics
+### Configuration Management
 ```bash
-# Active sessions
-GET /api/dashboard/sessions
+# User settings
+GET /api/config/settings
 
-# Costs and usage
-GET /api/dashboard/costs
+# Update settings
+PATCH /api/config/settings
+{
+  "theme": "dark",
+  "language": "en",
+  "notifications": {
+    "email": true,
+    "push": true,
+    "taskUpdates": true,
+    "systemAlerts": true
+  }
+}
 
-# Chat performance
-GET /api/dashboard/chat
+# AI providers
+GET /api/config/providers
+
+# API keys
+GET /api/config/apikeys
+
+# Add API key
+POST /api/config/apikeys
+{
+  "providerId": "provider-id",
+  "apiKey": "sk-api-key-here",
+  "keyName": "My API Key"
+}
 ```
 
-### Skills & Integration
+### Agent Communications
 ```bash
-# Complete skills list
-GET /api/skills
+# Create channel
+POST /api/agents/communications
+{
+  "action": "createChannel",
+  "channelName": "Test Channel",
+  "participants": ["agent:default:main", "agent:default:op"],
+  "channelType": "delegation"
+}
 
-# Compact manifest
-GET /api/skills?format=compact
+# Send message
+POST /api/agents/communications
+{
+  "action": "sendMessage",
+  "channelId": "channel-id",
+  "senderId": "agent:default:main",
+  "message": "Hello from agent!",
+  "messageType": "chat"
+}
 
-# Health check
-GET /api/health
+# Get delegations
+GET /api/agents/delegation?agentId=agent:default:main
+```
+
+### Activity Monitoring
+```bash
+# Get activities
+GET /api/activity/convex
+
+# Clear activities
+DELETE /api/activity
 ```
 
 ---
@@ -121,70 +225,98 @@ GET /api/health
 
 ### Default Agent
 - **General Purpose**: System context and general responses
-- **Skills Integration**: Access to all 25+ skills
+- **Skills Integration**: Access to all available skills
 - **Real-time Data**: Monitoring and status updates
 
-### Main Agent
+### Main Agent  
 - **Development Focus**: Coding, debugging, and development tasks
 - **Git Integration**: Repository management and code analysis
 - **Project Management**: Task tracking and workflow automation
 
 ### OP Agent
 - **Operations Focus**: Monitoring, alerts, and system management
-- **Crypto Integration**: Binance, Bybit, and blockchain monitoring
+- **Crypto Integration**: Binance, Bybit, blockchain monitoring
 - **Analytics**: Performance tracking and reporting
 
 ---
 
-## 📊 Session Management
+## 📊 Dashboard Features
 
-### Persistence System
-- **File Storage**: `sessions.json` for persistence
-- **Auto-save**: On every message sent/received
-- **Load on Startup**: Restore conversations on restart
-- **Multi-agent**: Each agent with separate history
+### Real-time Monitoring
+- **Active Sessions**: Track active agent sessions
+- **Cost Tracking**: Monitor API usage and costs
+- **Performance Metrics**: Response times and success rates
+- **Activity Feed**: Live agent activity updates
 
-### Chat History
-```typescript
-// Hook for UI integration
-const { messages, isLoading, addMessage } = useChatHistory('agent:default:main')
-```
+### Configuration Dashboard
+- **User Profiles**: Manage user accounts and settings
+- **API Key Management**: Secure encrypted storage
+- **Provider Settings**: Configure AI providers and models
+- **System Health**: Monitor platform status
 
 ---
 
 ## 🛠️ Architecture
 
-### Frontend (Next.js 14)
+### Frontend (Next.js 15)
 - **Modern UI**: React, TypeScript, TailwindCSS
-- **Real-time Chat**: WebSocket + Streaming
-- **Dashboard**: Analytics and monitoring
-- **Responsive**: Mobile-first design
+- **Real-time Updates**: WebSocket + Convex subscriptions
+- **Responsive Design**: Mobile-first approach
+- **Type Safety**: Strict TypeScript checking
 
-### Backend (Node.js)
+### Backend (Convex + Next.js API)
+- **Real-time Database**: Convex for live data
 - **API Routes**: REST endpoints for all functionality
-- **Session Management**: Conversation persistence
-- **Agent Integration**: OpenClaw Embedded Agent CLI
-- **File Storage**: JSON-based session persistence
+- **Authentication**: JWT-based session management
+- **File Storage**: JSON-based persistence
 
 ### OpenClaw Integration
-- **Embedded Agent**: `npx openclaw agent --local`
-- **Workspace Access**: `C:\Users\el\.openclaw\workspace`
+- **Embedded Agents**: Local OpenClaw agent CLI
+- **Workspace Access**: Direct file system integration
 - **Skills System**: 25+ predefined skills
 - **Tool Integration**: Read, Edit, Exec, Browser, etc.
 
 ---
 
-## 📋 Requirements
+## 📋 Available Skills
 
-### System Requirements
-- **Node.js**: Version 18.x or newer
-- **OpenClaw CLI**: Required for embedded agent functionality
-- **Git**: For version control and deployment
+| Category | Skills | Free APIs Used |
+|---|---|---|
+| AI / LLM | `llm-complete`, `llm-stream`, `embedded-chat` | OpenRouter, Groq, Gemini, Mistral |
+| Web Search | `web-search`, `news-search` | Tavily, Brave, DuckDuckGo |
+| Web Scraping | `scrape-url`, `extract-content` | Jina Reader, Firecrawl |
+| Code | `code-execute`, `code-analyze`, `repo-search` | E2B, GitHub API |
+| Blockchain | `mvx-balance`, `mvx-txns`, `price-feed` | MultiversX, CoinGecko |
+| Data | `weather`, `wiki-search`, `memory-store`, `memory-search` | Open-Meteo, Wikipedia |
+| System | `session-manager`, `cleanup`, `health-check` | OpenClaw CLI |
 
-### OpenClaw Setup
-- **Workspace**: `C:\Users\el\.openclaw\workspace`
-- **Configuration**: `openclaw.json` with model settings
-- **Skills**: Available in `workspace\skills\` directory
+---
+
+## 🎯 Development
+
+### Local Development
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
+```
+
+### Production Deployment
+```bash
+# Build optimized version
+npm run build
+
+# Deploy to Vercel
+npm run deploy
+```
 
 ---
 
@@ -196,120 +328,122 @@ const { messages, isLoading, addMessage } = useChatHistory('agent:default:main')
   "agents": {
     "defaults": {
       "model": {
-        "primary": "mistral/mistral-medium-latest",
-        "fallbacks": ["mistral/mistral-medium-latest"]
+        "primary": "gpt-4",
+        "fallbacks": ["gpt-4", "claude-3-opus"]
       }
     }
   },
   "gateway": {
     "mode": "local",
-    "auth": {
-      "mode": "token",
-      "token": "test-token"
-    }
-  }
+{{ ... }
 }
 ```
 
 ### Environment Variables
 ```bash
-# OpenClaw workspace
-OPENCLAW_WORKSPACE="C:\\Users\\el\\.openclaw\\workspace"
+# Convex Backend
+NEXT_PUBLIC_CONVEX_URL="https://your-convex-url.convex.cloud"
 
-# Gateway configuration
-GATEWAY_URL="ws://127.0.0.1:18789"
-GATEWAY_TOKEN="test-token"
+# Authentication
+JWT_SECRET="your-jwt-secret-key-here"
+
+# OpenClaw Integration
+OPENCLAW_WORKSPACE="C:\\Users\\username\\.openclaw\\workspace"
 ```
 
 ---
 
-## 📊 Available Skills
+## � Usage Examples
 
-| Category | Skills | Free APIs used |
-|---|---|---|
-| AI / LLM | `llm-complete`, `llm-stream`, `embedded-chat` | OpenRouter, Groq, Gemini, Mistral |
-| Web Search | `web-search`, `news-search` | Tavily, Brave, DuckDuckGo |
-| Web Scraping | `scrape-url`, `extract-content` | Jina Reader, Firecrawl |
-| Code | `code-execute`, `code-analyze`, `repo-search` | E2B, GitHub API |
-| Blockchain | `mvx-balance`, `mvx-txns`, `price-feed` | MultiversX, CoinGecko |
-| Data | `weather`, `wiki-search` | Open-Meteo, Wikipedia |
-| Memory | `memory-store`, `memory-search` | Upstash, Qdrant |
-
----
-
-## 🚀 Usage Examples
-
-### Chat with Agent
+### Authentication
 ```bash
-curl -X POST http://localhost:3000/api/agents/chat \
+# Register new user
+curl -X POST http://localhost:3000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "sessionKey": "agent:default:main",
-    "message": "What are you doing now?"
+    "email": "john@example.com",
+    "name": "John Doe",
+    "password": "password123",
+    "role": "user"
+  }'
+
+# Login user
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "password": "password123"
   }'
 ```
 
-### Dashboard Analytics
+### Agent Communications
 ```bash
-# Session monitoring
-curl http://localhost:3000/api/dashboard/sessions
+# Create delegation
+curl -X POST http://localhost:3000/api/agents/delegation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fromAgent": "agent:default:main",
+    "toAgent": "agent:default:op",
+    "task": "Analyze this data and provide insights",
+    "priority": "high"
+  }'
 
-# Costs and usage
-curl http://localhost:3000/api/dashboard/costs
+# Get delegations
+curl -X GET "http://localhost:3000/api/agents/delegation?agentId=agent:default:main"
 ```
 
-### Skill Integration
+### Configuration Management
 ```bash
-# Available skills
-curl http://localhost:3000/api/skills
+# Get user settings
+curl -X GET http://localhost:3000/api/config/settings
 
-# Integration manifest
-curl http://localhost:3000/api/skills?format=compact
+# Update settings
+curl -X PATCH http://localhost:3000/api/config/settings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "theme": "dark",
+    "language": "en",
+    "notifications": {
+      "email": true,
+      "push": true,
+      "taskUpdates": true,
+      "systemAlerts": true
+    }
+  }'
 ```
 
 ---
 
 ## 🤝 Contributing
 
-### Development
-```bash
-# Install dependencies
-npm install
-
-# Start development
-npm run dev
-
-# Run tests
-npm test
-
-# Build for production
-npm run build
-```
-
-### Contributing Guide
+### Development Workflow
 1. Fork repository
 2. Create feature branch
 3. Make changes
 4. Add tests
 5. Submit pull request
 
----
+### Code Style
+- **TypeScript**: Strict type checking enabled
+- **Prettier**: Code formatting configured
+- **ESLint**: Linting with strict rules
+- **Conventional Commits**: Clear and descriptive messages
 
-## 📄 License
+### � License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
----
+### 🤝 GitHub
 
-## 🔗 Useful Links
-
-- **GitHub**: https://github.com/Gzeu/openclaw-hub
+- **Repository**: https://github.com/Gzeu/openclaw-hub
 - **Issues**: https://github.com/Gzeu/openclaw-hub/issues
-- **Documentation**: http://localhost:3000/skill.md
+- **Discussions**: https://github.com/Gzeu/openclaw-hub/discussions
+
+---
+
+**🦄 OpenClaw Hub · v0.3.0 · MIT License**: http://localhost:3000/skill.md
 - **API Reference**: http://localhost:3000/api/skills
 - **OpenClaw**: https://github.com/openclaw-d
-
----
 
 ## 🎉 Conclusion
 

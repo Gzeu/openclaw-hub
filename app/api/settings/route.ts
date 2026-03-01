@@ -55,7 +55,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const { gatewayToken, gatewayUrl } = await request.json()
 
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     // Update OpenClaw config
     const { spawn } = require('child_process')
     
-    return new Promise((resolve) => {
+    return new Promise<NextResponse>((resolve) => {
       const child = spawn('npx', ['openclaw', 'config', 'set', 'gateway.auth.token', gatewayToken], {
         cwd: 'C:\\Users\\el\\.openclaw',
         stdio: ['pipe', 'pipe', 'pipe']

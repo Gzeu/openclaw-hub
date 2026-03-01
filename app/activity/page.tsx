@@ -37,7 +37,13 @@ export default function ActivityPage() {
 
   const load = async () => {
     try {
-      const data = await fetch('/api/activity?limit=100').then(r => r.json())
+      // Try Convex API first, fallback to in-memory
+      let data
+      try {
+        data = await fetch('/api/activity/convex?limit=100').then(r => r.json())
+      } catch {
+        data = await fetch('/api/activity?limit=100').then(r => r.json())
+      }
       setEntries(data.activity ?? [])
     } catch {}
     setLoading(false)

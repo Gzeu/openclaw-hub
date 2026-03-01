@@ -1,9 +1,12 @@
+"use node";
+
 import { 
   Address,
   Transaction,
   TransactionPayload,
   Account,
-  TokenTransfer
+  TokenTransfer,
+  UserSecretKey
 } from "@multiversx/sdk-core";
 import { UserSigner } from "@multiversx/sdk-wallet";
 import { ApiNetworkProvider } from "@multiversx/sdk-network-providers";
@@ -23,7 +26,8 @@ async function executeHubTransaction(funcName: string, paymentId: number): Promi
     throw new Error("Missing HUB_PRIVATE_KEY in environment variables.");
   }
 
-  const signer = UserSigner.fromHex(privateKeyHex);
+  const userSecretKey = UserSecretKey.fromPem(privateKeyHex);
+  const signer = new UserSigner(userSecretKey);
   const hubAddress = signer.getAddress();
   
   const accountOnNetwork = await networkProvider.getAccount(hubAddress);

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api-client'
+import AgentCommunicationsPanelFull from '@/components/AgentCommunicationsPanelFull'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// Types
 interface Agent {
   key: string
   label?: string
@@ -27,11 +28,11 @@ interface ChatMsg {
   ts: string
 }
 
-// ─── Utils ───────────────────────────────────────────────────────────────────
+// Utils
 const truncate = (s: string, n = 12) =>
   s.length > n ? s.slice(0, 6) + '...' + s.slice(-4) : s
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// Sub-components
 function StatusDot({ online }: { online: boolean }) {
   return (
     <span className="relative flex h-2.5 w-2.5">
@@ -208,7 +209,7 @@ function SandboxPanel({
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// Main Page
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [agentsLoading, setAgentsLoading] = useState(true)
@@ -229,7 +230,7 @@ export default function AgentsPage() {
   const [sandboxLoading, setSandboxLoading] = useState(false)
 
   // Active tab on right panel
-  const [rightTab, setRightTab] = useState<'sandbox' | 'delegate'>('sandbox')
+  const [rightTab, setRightTab] = useState<'sandbox' | 'delegate' | 'communications'>('sandbox')
 
   // Delegate
   const [delegateTask, setDelegateTask] = useState('')
@@ -237,7 +238,7 @@ export default function AgentsPage() {
   const [delegateLoading, setDelegateLoading] = useState(false)
   const [delegateResult, setDelegateResult] = useState<any>(null)
 
-  // ── Fetch agents ─────────────────────────────────────────────────────────
+  // Fetch agents
   useEffect(() => {
     const load = async () => {
       setAgentsLoading(true)
@@ -259,7 +260,7 @@ export default function AgentsPage() {
     return () => clearInterval(iv)
   }, [])
 
-  // ── Chat handler ─────────────────────────────────────────────────────────────
+  // Chat handler
   const send = async () => {
     if (!selectedAgent || !input.trim()) return
     const userMsg = { role: 'user' as const, text: input, ts: new Date().toISOString() }
@@ -296,7 +297,7 @@ export default function AgentsPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // ── Sandbox ───────────────────────────────────────────────────────────────
+  // Sandbox
   const runSandbox = async () => {
     if (!code.trim() || sandboxLoading) return
     setSandboxLoading(true)
@@ -322,7 +323,7 @@ export default function AgentsPage() {
     }
   }
 
-  // ── Delegate ──────────────────────────────────────────────────────────────
+  // Delegate
   const runDelegate = async () => {
     if (!delegateTask.trim() || !selectedAgent || !delegateTarget || delegateLoading)
       return
@@ -349,10 +350,10 @@ export default function AgentsPage() {
     }
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Render
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
-      {/* ── Topbar ──────────────────────────────────────────────────────── */}
+      {/* Topbar */}
       <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="max-w-[1600px] mx-auto px-6 h-14 flex items-center gap-4">
           <a href="/" className="flex items-center gap-2 mr-4">
@@ -383,7 +384,7 @@ export default function AgentsPage() {
         </div>
       </header>
 
-      {/* ── Main 3-panel layout ─────────────────────────────────────────── */}
+      {/* Main 3-panel layout */}
       <div className="flex-1 flex max-w-[1600px] mx-auto w-full">
         {/* Panel 1 — Agent list */}
         <aside className="w-72 shrink-0 border-r border-zinc-800/80 flex flex-col">
@@ -514,17 +515,17 @@ export default function AgentsPage() {
         <aside className="w-[420px] shrink-0 flex flex-col">
           {/* Tabs */}
           <div className="flex border-b border-zinc-800">
-            {(['sandbox', 'delegate'] as const).map((tab) => (
+            {(['sandbox', 'delegate', 'communications'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setRightTab(tab)}
-                className={`flex-1 py-3 text-xs font-semibold uppercase tracking-widest transition-colors ${
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                   rightTab === tab
-                    ? 'text-violet-300 border-b-2 border-violet-500'
+                    ? 'text-violet-400 border-b-2 border-violet-400'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                {tab === 'sandbox' ? '⚡ E2B Sandbox' : '🔀 A2A Delegate'}
+                {tab === 'sandbox' ? '⚡ E2B Sandbox' : tab === 'delegate' ? '🔀 A2A Delegate' : '💬 Communications'}
               </button>
             ))}
           </div>
@@ -561,7 +562,7 @@ export default function AgentsPage() {
                 <SandboxPanel result={sandboxResult} loading={sandboxLoading} />
               </div>
             </div>
-          ) : (
+          ) : rightTab === 'delegate' ? (
             <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
               <div>
                 <label className="text-xs text-zinc-400 mb-1.5 block">
@@ -628,6 +629,8 @@ export default function AgentsPage() {
                 </div>
               )}
             </div>
+          ) : (
+            <AgentCommunicationsPanelFull agentId={selectedAgent?.key || ''} />
           )}
         </aside>
       </div>

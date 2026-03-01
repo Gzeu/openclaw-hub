@@ -1,3 +1,5 @@
+"use node";
+
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
@@ -66,7 +68,7 @@ export const verifyPendingDeposits = internalAction({
           });
 
           // 6. Punem agentul la treabă pasandu-i ID-ul real al platii!
-          await ctx.runAction(internal.agent.runAIAgent, {
+          await ctx.runAction(internal.agentNode.runAIAgent, {
             taskId: task._id,
             prompt: task.prompt,
             paymentId: extractedPaymentId

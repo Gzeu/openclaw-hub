@@ -1,0 +1,5 @@
+{
+  "node": {
+    "externalPackages": ["@multiversx/sdk-core", "@multiversx/sdk-wallet", "@multiversx/sdk-bls-wasm"]
+  }
+}

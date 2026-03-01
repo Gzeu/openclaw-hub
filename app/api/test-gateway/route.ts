@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const { gatewayUrl, gatewayToken } = await request.json()
     
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     // Test connection by trying to connect to Gateway
     const WebSocket = require('ws')
     
-    return new Promise((resolve) => {
+    return new Promise<NextResponse>((resolve) => {
       const ws = new WebSocket(gatewayUrl, {
         headers: {
           'Authorization': gatewayToken,

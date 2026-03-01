@@ -21,6 +21,9 @@ export interface GatewaySession {
 const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'ws://localhost:18789'
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || ''
 
+// Convex integration for agent communications
+import { getConvexServerClient } from './convex-client'
+
 export async function listSessions(): Promise<GatewaySession[]> {
   // REST fallback — OpenClaw Gateway exposes HTTP on same port
   const base = GATEWAY_URL.replace(/^ws/, 'http')
@@ -30,6 +33,88 @@ export async function listSessions(): Promise<GatewaySession[]> {
   })
   if (!res.ok) return []
   return res.json()
+}
+
+// Agent delegation via Convex
+export async function delegateTaskToAgent(
+  fromAgent: string,
+  toAgent: string,
+  task: string,
+  priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium',
+  context?: any
+) {
+  try {
+    const response = await fetch('/api/agents/delegation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fromAgent,
+        toAgent,
+        task,
+        priority,
+        context,
+      }),
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Delegation failed: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Agent delegation error:', error)
+    throw error
+  }
+}
+
+// Agent heartbeat via Convex
+export async function updateAgentHeartbeat(
+  agentId: string,
+  status: 'online' | 'busy' | 'offline',
+  currentTask?: string,
+  capabilities?: string[]
+) {
+  try {
+    const response = await fetch('/api/agents/communications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'updateHeartbeat',
+        agentId,
+        status,
+        currentTask,
+        capabilities,
+      }),
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Heartbeat update failed: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Agent heartbeat error:', error)
+    throw error
+  }
+}
+
+// Get agent delegations
+export async function getAgentDelegations(agentId: string, status?: string) {
+  try {
+    const params = new URLSearchParams({ agentId })
+    if (status) params.append('status', status)
+    
+    const response = await fetch(`/api/agents/delegation?${params}`)
+    
+    if (!response.ok) {
+      throw new Error(`Get delegations failed: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Get delegations error:', error)
+    throw error
+  }
 }
 
 // Session storage for conversation persistence
