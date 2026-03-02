@@ -28,6 +28,91 @@ interface ChatMsg {
   ts: string
 }
 
+interface Model {
+  id: string
+  name: string
+  provider: string
+  description: string
+  context: string
+  icon: string
+  category: 'general' | 'reasoning' | 'coding' | 'conversational' | 'planning' | 'heavy'
+}
+
+const MODELS: Model[] = [
+  {
+    id: 'aurora-alpha-free-full-context',
+    name: 'Aurora Alpha Full Context',
+    provider: 'Literouter',
+    description: 'Unlimited context, generalist with large context handling',
+    context: 'You are an AI assistant integrated with OpenClaw. You excel at handling large context, previous messages, and long documents. Perfect for comprehensive analysis and detailed conversations.',
+    icon: '🌟',
+    category: 'general'
+  },
+  {
+    id: 'ernie-4-5-21b-a3b-thinking-free',
+    name: 'Ernie 4.5 Thinking',
+    provider: 'Literouter',
+    description: 'Specialized for reasoning and chain-of-thought, excellent planner',
+    context: 'You are Ernie 4.5 Thinking, an AI assistant integrated with OpenClaw. You specialize in reasoning and chain-of-thought processes. You excel as a planner for complex tasks, providing detailed step-by-step analysis.',
+    icon: '🧠',
+    category: 'planning'
+  },
+  {
+    id: 'gemini-free',
+    name: 'Gemini',
+    provider: 'Literouter',
+    description: 'Excellent general assistant, stable fallback for mixed tasks',
+    context: 'You are Gemini, an AI assistant integrated with OpenClaw. You are excellent at handling mixed tasks including coding, text analysis, and explanations. You serve as a reliable fallback for various requests.',
+    icon: '💎',
+    category: 'general'
+  },
+  {
+    id: 'gemma-3-27b-it-free',
+    name: 'Gemma 3 27B',
+    provider: 'Literouter',
+    description: 'Large model, excellent at reasoning and coding, heavy brain for tasks',
+    context: 'You are Gemma 3 27B, an AI assistant integrated with OpenClaw. You are a large model excellent at reasoning and coding. You serve as the "heavy brain" for complex and difficult tasks in agent workflows.',
+    icon: '💎',
+    category: 'heavy'
+  },
+  {
+    id: 'kat-coder-pro-free',
+    name: 'Kat Coder Pro',
+    provider: 'Literouter',
+    description: 'Specialized for coding, perfect for code tools',
+    context: 'You are Kat Coder Pro, an AI assistant integrated with OpenClaw. You specialize in coding tasks including code generation, refactoring, and bug fixing. You are perfect for code-related tools and development tasks.',
+    icon: '👨‍💻',
+    category: 'coding'
+  },
+  {
+    id: 'llama-3-1-8b-instruct-turbo-free',
+    name: 'Llama 3.1 8B Turbo',
+    provider: 'Literouter',
+    description: 'Fast, inexpensive, quite smart - ideal workhorse for OpenClaw',
+    context: 'You are Llama 3.1 8B Turbo, an AI assistant integrated with OpenClaw. You are fast, inexpensive, and quite smart. You serve as ideal workhorse model for OpenClaw, handling most tasks efficiently.',
+    icon: '🦙',
+    category: 'general'
+  },
+  {
+    id: 'qwen3-32b-free',
+    name: 'Qwen3 32B',
+    provider: 'Literouter',
+    description: 'Very powerful at reasoning, coding, planning - ideal brain model',
+    context: 'You are Qwen3 32B, an AI assistant integrated with OpenClaw. You are very powerful at reasoning, coding, and planning. You serve as ideal "brain model" called only for heavy and difficult tasks.',
+    icon: '🧬',
+    category: 'heavy'
+  },
+  {
+    id: 'qwen2.5-7b-instruct-free',
+    name: 'Qwen2.5 7B',
+    provider: 'Literouter',
+    description: 'Excellent at coding and reasoning mid-tier, great principal model',
+    context: 'You are Qwen2.5 7B, an AI assistant integrated with OpenClaw. You are excellent at coding and reasoning, making you a great candidate for principal model handling code and tool-use tasks.',
+    icon: '🎯',
+    category: 'coding'
+  }
+]
+
 // Utils
 const truncate = (s: string, n = 12) =>
   s.length > n ? s.slice(0, 6) + '...' + s.slice(-4) : s
@@ -215,11 +300,13 @@ export default function AgentsPage() {
   const [agentsLoading, setAgentsLoading] = useState(true)
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
 
-  // Chat
-  const [messages, setMessages] = useState<ChatMsg[]>([])
-  const [input, setInput] = useState('')
-  const [chatLoading, setChatLoading] = useState(false)
-  const chatEndRef = useRef<HTMLDivElement>(null)
+  // AI Chat
+  const [aiMessages, setAiMessages] = useState<ChatMsg[]>([])
+  const [aiInput, setAiInput] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [selectedModel, setSelectedModel] = useState(MODELS[0])
+  const [showModelSelector, setShowModelSelector] = useState(false)
+  const aiChatEndRef = useRef<HTMLDivElement>(null)
 
   // Sandbox
   const [code, setCode] = useState(
@@ -229,8 +316,7 @@ export default function AgentsPage() {
   const [sandboxResult, setSandboxResult] = useState<SandboxResult | null>(null)
   const [sandboxLoading, setSandboxLoading] = useState(false)
 
-  // Active tab on right panel
-  const [rightTab, setRightTab] = useState<'sandbox' | 'delegate' | 'communications'>('sandbox')
+  type RightTab = 'sandbox' | 'delegate' | 'ai-chat' | 'communications'
 
   // Delegate
   const [delegateTask, setDelegateTask] = useState('')
@@ -260,7 +346,7 @@ export default function AgentsPage() {
     return () => clearInterval(iv)
   }, [])
 
-  // Chat handler
+  // Agent chat handler
   const send = async () => {
     if (!selectedAgent || !input.trim()) return
     const userMsg = { role: 'user' as const, text: input, ts: new Date().toISOString() }
@@ -293,9 +379,51 @@ export default function AgentsPage() {
     setInput('')
   }
 
+  // AI chat handler
+  const sendAiChat = async () => {
+    if (!aiInput.trim()) return
+    const userMsg = { role: 'user' as const, text: aiInput, ts: new Date().toISOString() }
+    setAiMessages((m) => [...m, userMsg])
+    setAiLoading(true)
+    try {
+      const token = localStorage.getItem('auth-token')
+      const res = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          message: aiInput,
+          model: selectedModel.id,
+          provider: selectedModel.provider
+        }),
+      })
+      const data = await res.json()
+      const aiMsg: ChatMsg = {
+        role: 'agent',
+        text: data.response || 'Sorry, I could not generate a response.',
+        ts: new Date().toISOString(),
+      }
+      setAiMessages((m) => [...m, aiMsg])
+    } catch (e: any) {
+      setAiMessages((m) => [
+        ...m,
+        { role: 'agent', text: `Error: ${e.message}`, ts: new Date().toISOString() },
+      ])
+    } finally {
+      setAiLoading(false)
+    }
+    setAiInput('')
+  }
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [aiMessages])
 
   // Sandbox
   const runSandbox = async () => {
@@ -361,12 +489,14 @@ export default function AgentsPage() {
             <span className="font-bold text-white tracking-tight">OpenClaw Hub</span>
           </a>
           <nav className="flex gap-1">
-            {[['/', 'Projects'], ['/agents', 'Agents']].map(([href, label]) => (
+            {[['/', 'Projects'], ['/agents', 'Agents'], ['/chat', 'Chat']].map(([href, label]) => (
               <a
                 key={href}
                 href={href}
                 className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   href === '/agents'
+                    ? 'bg-violet-600/20 text-violet-300'
+                    : href === '/chat'
                     ? 'bg-violet-600/20 text-violet-300'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                 }`}
@@ -447,25 +577,57 @@ export default function AgentsPage() {
             )}
           </div>
 
+          {/* Chat Type Tabs */}
+          <div className="flex border-b border-zinc-800">
+            <button
+              onClick={() => setRightTab('agent-chat')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                rightTab === 'agent-chat'
+                  ? 'text-violet-400 border-b-2 border-violet-400'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              🤖 Agent Chat
+            </button>
+            <button
+              onClick={() => setRightTab('ai-chat')}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                rightTab === 'ai-chat'
+                  ? 'text-violet-400 border-b-2 border-violet-400'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              💬 AI Chat
+            </button>
+          </div>
+
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-5 py-4">
-            {messages.length === 0 && (
+            {(rightTab === 'agent-chat' ? messages : aiMessages).length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center">
-                <span className="text-5xl mb-3">🤖</span>
+                <span className="text-5xl mb-3">
+                  {rightTab === 'agent-chat' ? '🤖' : '💬'}
+                </span>
                 <p className="text-zinc-400 font-medium">
-                  {selectedAgent
-                    ? `Chat with ${selectedAgent.label ?? selectedAgent.key}`
-                    : 'Select an agent to start'}
+                  {rightTab === 'agent-chat'
+                    ? `Chat with ${selectedAgent?.label ?? selectedAgent?.key}`
+                    : selectedModel
+                    ? `Chat with ${selectedModel.name}`
+                    : 'Select a model to start'
+                  }
                 </p>
                 <p className="text-zinc-600 text-sm mt-1">
-                  Messages stream via OpenClaw Gateway
+                  {rightTab === 'agent-chat'
+                    ? 'Messages stream via OpenClaw Gateway'
+                    : 'Messages powered by Literouter AI'
+                  }
                 </p>
               </div>
             )}
-            {messages.map((m, i) => (
+            {(rightTab === 'agent-chat' ? messages : aiMessages).map((m, i) => (
               <ChatBubble key={i} msg={m} />
             ))}
-            {chatLoading && (
+            {(rightTab === 'agent-chat' ? chatLoading : aiLoading) && (
               <div className="flex justify-start mb-3">
                 <div className="bg-zinc-800 border border-zinc-700 px-4 py-2.5 rounded-2xl rounded-bl-sm">
                   <span className="flex gap-1">
@@ -480,34 +642,121 @@ export default function AgentsPage() {
                 </div>
               </div>
             )}
-            <div ref={chatEndRef} />
+            <div ref={rightTab === 'agent-chat' ? chatEndRef : aiChatEndRef} />
           </div>
 
           {/* Input */}
           <div className="px-5 py-4 border-t border-zinc-800">
-            <div className="flex gap-2">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === 'Enter' && !e.shiftKey && send()
-                }
-                placeholder={
-                  selectedAgent
-                    ? `Message ${selectedAgent.label ?? selectedAgent.key}...`
-                    : 'Select an agent first'
-                }
-                disabled={!selectedAgent || chatLoading}
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors disabled:opacity-40"
-              />
-              <button
-                onClick={send}
-                disabled={!selectedAgent || !input.trim() || chatLoading}
-                className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
-              >
-                Send
-              </button>
-            </div>
+            {rightTab === 'agent-chat' ? (
+              <div className="flex gap-2">
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) =>
+                    e.key === 'Enter' && !e.shiftKey && send()
+                  }
+                  placeholder={
+                    selectedAgent
+                      ? `Message ${selectedAgent.label ?? selectedAgent.key}...`
+                      : 'Select an agent first'
+                  }
+                  disabled={!selectedAgent || chatLoading}
+                  className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors disabled:opacity-40"
+                />
+                <button
+                  onClick={send}
+                  disabled={!selectedAgent || !input.trim() || chatLoading}
+                  className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+                >
+                  Send
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Model Selector */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowModelSelector(!showModelSelector)}
+                    className="flex items-center gap-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white hover:bg-zinc-700 transition-colors"
+                  >
+                    <span>{selectedModel.icon}</span>
+                    <span>{selectedModel.name}</span>
+                    <span className="ml-auto">▼</span>
+                  </button>
+                  <div className="text-xs text-zinc-500">
+                    {selectedModel.description}
+                  </div>
+                </div>
+
+                {/* Model Selector Modal */}
+                {showModelSelector && (
+                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-white">Select AI Model</h3>
+                        <button
+                          onClick={() => setShowModelSelector(false)}
+                          className="text-zinc-400 hover:text-white"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {MODELS.map((model) => (
+                          <button
+                            key={model.id}
+                            onClick={() => {
+                              setSelectedModel(model)
+                              setShowModelSelector(false)
+                            }}
+                            className={`p-3 rounded-lg border text-left transition-colors ${
+                              selectedModel.id === model.id
+                                ? 'bg-violet-600/20 border-violet-500/60'
+                                : 'bg-zinc-800/60 border-zinc-700 hover:border-zinc-600'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xl">{model.icon}</span>
+                              <div>
+                                <div className="font-medium text-white">{model.name}</div>
+                                <div className="text-xs text-zinc-400">{model.provider}</div>
+                              </div>
+                            </div>
+                            <div className="text-xs text-zinc-300">{model.description}</div>
+                            <div className="mt-2">
+                              <span className="text-[10px] px-2 py-1 rounded bg-zinc-700 text-zinc-300">
+                                {model.category}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Chat Input */}
+                <div className="flex gap-2">
+                  <input
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    onKeyDown={(e) =>
+                      e.key === 'Enter' && !e.shiftKey && sendAiChat()
+                    }
+                    placeholder={`Message ${selectedModel.name}...`}
+                    disabled={aiLoading}
+                    className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors disabled:opacity-40"
+                  />
+                  <button
+                    onClick={sendAiChat}
+                    disabled={!aiInput.trim() || aiLoading}
+                    className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+                  >
+                    {aiLoading ? 'Sending...' : 'Send'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
