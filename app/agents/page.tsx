@@ -156,7 +156,7 @@ function AgentCard({
   selected,
   onClick,
 }: {
-  agent: Agent
+  agent: any
   selected: boolean
   onClick: () => void
 }) {
@@ -172,22 +172,37 @@ function AgentCard({
       <div className="flex items-center gap-2.5 mb-2">
         <StatusDot online={agent.online} />
         <span className="text-sm font-semibold text-white truncate flex-1">
-          {agent.label ?? agent.key}
+          {agent.label}
         </span>
         {agent.pricePerTask && (
           <span className="text-[10px] text-emerald-400 font-mono">
             {agent.pricePerTask} EGLD
           </span>
         )}
+        {agent.source === 'convex' && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
+            Custom
+          </span>
+        )}
       </div>
       <div className="flex flex-wrap gap-1 mb-2">
-        {agent.capabilities.map((c) => (
+        {agent.capabilities.map((c: string) => (
           <CapBadge key={c} cap={c} />
         ))}
       </div>
       {agent.address && (
         <p className="text-[10px] text-zinc-500 font-mono">
           {truncate(agent.address, 24)}
+        </p>
+      )}
+      {agent.description && (
+        <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
+          {agent.description}
+        </p>
+      )}
+      {agent.preferredModel && (
+        <p className="text-[10px] text-zinc-500 mt-1">
+          Model: {agent.preferredModel}
         </p>
       )}
     </button>
@@ -340,23 +355,8 @@ export default function AgentsPage() {
 
   // Fetch agents
   useEffect(() => {
-    const load = async () => {
-      setAgentsLoading(true)
-      try {
-        const res = await api.getAgents()
-        const data = await res.json()
-        setAgents(data.agents ?? [])
-        if (data.agents?.length > 0 && !selectedAgent) {
-          setSelectedAgent(data.agents[0])
-        }
-      } catch {
-        setAgents([])
-      } finally {
-        setAgentsLoading(false)
-      }
-    }
-    load()
-    const iv = setInterval(load, 15000)
+    loadAgents()
+    const iv = setInterval(loadAgents, 15000)
     return () => clearInterval(iv)
   }, [])
 
@@ -367,8 +367,25 @@ export default function AgentsPage() {
     
     // Refresh agents list
     setTimeout(() => {
-      window.location.reload() // Simple refresh for now
+      loadAgents() // Refresh agents without full page reload
     }, 1000)
+  }
+
+  // Load agents function
+  const loadAgents = async () => {
+    setAgentsLoading(true)
+    try {
+      const res = await api.getAgents()
+      const data = await res.json()
+      setAgents(data.agents ?? [])
+      if (data.agents?.length > 0 && !selectedAgent) {
+        setSelectedAgent(data.agents[0])
+      }
+    } catch {
+      setAgents([])
+    } finally {
+      setAgentsLoading(false)
+    }
   }
 
   // Show toast
