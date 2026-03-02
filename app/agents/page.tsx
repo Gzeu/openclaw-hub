@@ -300,6 +300,12 @@ export default function AgentsPage() {
   const [agentsLoading, setAgentsLoading] = useState(true)
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
 
+  // Agent Chat
+  const [messages, setMessages] = useState<ChatMsg[]>([])
+  const [input, setInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
   // AI Chat
   const [aiMessages, setAiMessages] = useState<ChatMsg[]>([])
   const [aiInput, setAiInput] = useState('')
@@ -316,7 +322,10 @@ export default function AgentsPage() {
   const [sandboxResult, setSandboxResult] = useState<SandboxResult | null>(null)
   const [sandboxLoading, setSandboxLoading] = useState(false)
 
-  type RightTab = 'sandbox' | 'delegate' | 'ai-chat' | 'communications'
+  type RightTab = 'sandbox' | 'delegate' | 'ai-chat' | 'communications' | 'agent-chat'
+
+  // Active tab on right panel
+  const [rightTab, setRightTab] = useState<RightTab>('ai-chat')
 
   // Delegate
   const [delegateTask, setDelegateTask] = useState('')
@@ -624,7 +633,7 @@ export default function AgentsPage() {
                 </p>
               </div>
             )}
-            {(rightTab === 'agent-chat' ? messages : aiMessages).map((m, i) => (
+            {(rightTab === 'agent-chat' ? messages : aiMessages).map((m: any, i: number) => (
               <ChatBubble key={i} msg={m} />
             ))}
             {(rightTab === 'agent-chat' ? chatLoading : aiLoading) && (
