@@ -108,6 +108,7 @@ export default defineSchema({
     preferredModel: v.optional(v.string()),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
+    lastUsed: v.optional(v.number()),
   }),
 
   tasks: defineTable({

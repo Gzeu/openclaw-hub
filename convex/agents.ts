@@ -64,6 +64,20 @@ export const createAgent = mutation({
   },
 });
 
+export const updateAgentLastUsed = mutation({
+  args: {
+    agentId: v.id("agents"),
+    lastUsed: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.agentId, {
+      lastUsed: args.lastUsed,
+      updatedAt: Date.now(),
+    })
+    return { success: true }
+  },
+});
+
 export const seedNativeAgent = mutation({
   args: {},
   handler: async (ctx) => {
