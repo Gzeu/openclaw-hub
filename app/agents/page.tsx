@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api-client'
 import AgentCommunicationsPanelFull from '@/components/AgentCommunicationsPanelFull'
+import CreateAgentForm from '@/components/CreateAgentForm'
 
 // Types
 interface Agent {
@@ -333,6 +334,10 @@ export default function AgentsPage() {
   const [delegateLoading, setDelegateLoading] = useState(false)
   const [delegateResult, setDelegateResult] = useState<any>(null)
 
+  // Create Agent Modal
+  const [showCreateAgent, setShowCreateAgent] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
   // Fetch agents
   useEffect(() => {
     const load = async () => {
@@ -354,6 +359,25 @@ export default function AgentsPage() {
     const iv = setInterval(load, 15000)
     return () => clearInterval(iv)
   }, [])
+
+  // Handle agent creation success
+  const handleAgentCreated = (agentId: string, sessionKey: string) => {
+    setShowCreateAgent(false)
+    setToast({ message: 'Agent created successfully!', type: 'success' })
+    
+    // Refresh agents list
+    setTimeout(() => {
+      window.location.reload() // Simple refresh for now
+    }, 1000)
+  }
+
+  // Show toast
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [toast])
 
   // Agent chat handler
   const send = async () => {
@@ -527,10 +551,16 @@ export default function AgentsPage() {
       <div className="flex-1 flex max-w-[1600px] mx-auto w-full">
         {/* Panel 1 — Agent list */}
         <aside className="w-72 shrink-0 border-r border-zinc-800/80 flex flex-col">
-          <div className="px-4 py-3 border-b border-zinc-800">
+          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
             <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">
               Agents
             </p>
+            <button
+              onClick={() => setShowCreateAgent(true)}
+              className="px-2 py-1 bg-violet-600 hover:bg-violet-500 text-white text-xs rounded-lg transition-colors"
+            >
+              + Create
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {agentsLoading
@@ -892,6 +922,29 @@ export default function AgentsPage() {
           )}
         </aside>
       </div>
+
+      {/* Create Agent Modal */}
+      {showCreateAgent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="relative">
+            <CreateAgentForm
+              onSuccess={handleAgentCreated}
+              onCancel={() => setShowCreateAgent(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg text-sm ${
+          toast.type === 'success' 
+            ? 'bg-emerald-600 text-white' 
+            : 'bg-red-600 text-white'
+        }`}>
+          {toast.message}
+        </div>
+      )}
     </div>
   )
 }

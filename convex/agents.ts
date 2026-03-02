@@ -29,6 +29,41 @@ export const registerAgent = mutation({
   },
 });
 
+export const createAgent = mutation({
+  args: {
+    name: v.string(),
+    skills: v.array(v.string()),
+    model: v.string(),
+    description: v.optional(v.string()),
+    owner: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Generate unique session key
+    const randomId = Math.random().toString(36).substring(2, 8);
+    const sessionKey = `agent:${args.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}:${randomId}`;
+    
+    const agentId = await ctx.db.insert("agents", {
+      name: args.name,
+      description: args.description || `Agent ${args.name} with skills: ${args.skills.join(", ")}`,
+      walletAddress: args.owner,
+      capabilities: args.skills,
+      isActive: true,
+      version: "1.0",
+      framework: "OpenClaw Hub",
+      sessionKey,
+      preferredModel: args.model,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    
+    return {
+      success: true,
+      agentId,
+      sessionKey,
+    };
+  },
+});
+
 export const seedNativeAgent = mutation({
   args: {},
   handler: async (ctx) => {

@@ -104,6 +104,10 @@ export default defineSchema({
     version: v.optional(v.string()),
     framework: v.optional(v.string()),
     endpointUrl: v.optional(v.string()),
+    sessionKey: v.optional(v.string()),
+    preferredModel: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
   }),
 
   tasks: defineTable({
