@@ -17,6 +17,37 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Get user from token first
+    const token = req.headers.get('authorization')?.replace('Bearer ', '')
+    
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'No authentication token provided' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Check if user is authenticated
+    const userResponse = await fetch(`http://localhost:3000/api/auth/me`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+
+    if (!userResponse.ok) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid token' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    const userData = await userResponse.json()
+    
+    if (!userData.user) {
+      return new Response(JSON.stringify({ error: 'User not found' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     // Check if this is a custom agent from Convex
     const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
     const agents = await convex.query(api.agents.getActiveAgents)
@@ -24,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     if (customAgent) {
       // Handle custom agent with Literouter model
-      return await handleCustomAgent(customAgent, text, req)
+      return await handleCustomAgent(customAgent, text, req, token)
     } else {
       // Handle OpenClaw Gateway agent
       const stream = await sendToAgent(sessionKey, text)
@@ -44,39 +75,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function handleCustomAgent(agent: any, text: string, req: NextRequest) {
+async function handleCustomAgent(agent: any, text: string, req: NextRequest, token: string) {
   try {
-    // Get user from token
-    const token = req.headers.get('authorization')?.replace('Bearer ', '')
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No authentication token provided' },
-        { status: 401 }
-      )
-    }
-
-    // Check if user is authenticated
-    const userResponse = await fetch(`http://localhost:3000/api/auth/me`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-
-    if (!userResponse.ok) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Invalid token' },
-        { status: 401 }
-      )
-    }
-
-    const userData = await userResponse.json()
-
-    if (!userData.user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 401 }
-      )
-    }
-
     // Check if agent has preferred model
     if (!agent.preferredModel) {
       return NextResponse.json(
@@ -87,7 +87,7 @@ async function handleCustomAgent(agent: any, text: string, req: NextRequest) {
 
     // Get available skills for this agent
     const agentSkills = agent.capabilities || []
-
+    
     // Create system prompt based on agent skills
     const skillDescriptions = {
       'chat': 'general conversation and Q&A',
@@ -190,7 +190,7 @@ Current user request: ${text}`
 
     // Return streaming response for consistency
     const streamData = `data: ${JSON.stringify({ response: agentResponse })}\n\n`
-
+    
     return new Response(streamData, {
       headers: {
         'Content-Type': 'text/event-stream',
