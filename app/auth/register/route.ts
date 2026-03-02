@@ -1,0 +1,100 @@
+import { NextRequest, NextResponse } from 'next/server'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import { v } from 'convex/values'
+import { ConvexHttpClient } from 'convex/browser'
+import { api } from '@/convex/_generated/api'
+
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
+export async function POST(req: NextRequest) {
+  try {
+    const { email, password, name } = await req.json()
+
+    // Validation
+    if (!email || !password || !name) {
+      return NextResponse.json(
+        { error: 'Email, password, and name are required' },
+        { status: 400 }
+      )
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      )
+    }
+
+    // Password validation
+    if (password.length < 8) {
+      return NextResponse.json(
+        { error: 'Password must be at least 8 characters' },
+        { status: 400 }
+      )
+    }
+
+    // Connect to Convex
+    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+
+    // Check if user already exists
+    const existingUsers = await convex.query(api.users.getUserByEmail, { email })
+    if (existingUsers.length > 0) {
+      return NextResponse.json(
+        { error: 'User with this email already exists' },
+        { status: 409 }
+      )
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12)
+
+    // Create user
+    const userId = await convex.mutation(api.users.createUser, {
+      email,
+      password: hashedPassword,
+      name,
+      role: 'user',
+      isActive: true,
+      emailVerified: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    })
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: userId,
+        email,
+        name,
+        role: 'user'
+      },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '7d' }
+    )
+
+    // Return success response
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: userId,
+        email,
+        name,
+        role: 'user',
+        isActive: true,
+        emailVerified: false
+      },
+      token
+    })
+
+  } catch (error: any) {
+    console.error('Registration error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Registration failed' },
+      { status: 500 }
+    )
+  }
+}

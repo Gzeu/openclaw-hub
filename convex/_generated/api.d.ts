@@ -22,6 +22,7 @@ import type * as seed from "../seed.js";
 import type * as sessionMutations from "../sessionMutations.js";
 import type * as tasks from "../tasks.js";
 import type * as tools from "../tools.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   sessionMutations: typeof sessionMutations;
   tasks: typeof tasks;
   tools: typeof tools;
+  users: typeof users;
 }>;
 
 /**

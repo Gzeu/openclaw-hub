@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import AuthGuard from '@/components/AuthGuard'
+import UserProfile from '@/components/UserProfile'
 import { api } from '@/lib/api-client'
 import AgentCommunicationsPanelFull from '@/components/AgentCommunicationsPanelFull'
 import CreateAgentForm from '@/components/CreateAgentForm'
@@ -561,7 +563,8 @@ export default function AgentsPage() {
 
   // Render
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
+    <AuthGuard>
+      <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
       {/* Topbar */}
       <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="max-w-[1600px] mx-auto px-6 h-14 flex items-center gap-4">
@@ -591,6 +594,7 @@ export default function AgentsPage() {
               {agents.filter((a) => a.online).length} online
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <UserProfile onLogout={() => window.location.href = '/auth'} />
           </div>
         </div>
       </header>
@@ -993,6 +997,7 @@ export default function AgentsPage() {
           {toast.message}
         </div>
       )}
-    </div>
+      </div>
+    </AuthGuard>
   )
 }
