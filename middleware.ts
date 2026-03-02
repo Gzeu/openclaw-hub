@@ -18,11 +18,7 @@ const PUBLIC_AGENT_PATHS = [
   '/api/agents/webhook',
 ];
 
-export default authkitMiddleware({
-  debug: process.env.NODE_ENV === 'development',
-});
-
-export function middleware(request: NextRequest) {
+export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Only gate /api/agents/* routes
@@ -39,18 +35,25 @@ export function middleware(request: NextRequest) {
   const agentsApiKey = process.env.AGENTS_API_KEY ?? '';
   const isDev        = process.env.NODE_ENV === 'development';
 
+  // Check for API key authentication first (for external calls)
+  const providedCron   = request.headers.get('x-cron-secret')  ?? '';
+  const providedApiKey = request.headers.get('x-api-key')      ?? '';
+
+  const validCron   = cronSecret   && providedCron   === cronSecret;
+  const validApiKey = agentsApiKey && providedApiKey === agentsApiKey;
+
+  // If valid API key authentication, allow through
+  if (validCron || validApiKey) {
+    return NextResponse.next();
+  }
+
   // In development, allow all requests without authentication
   if (isDev) {
     return NextResponse.next();
   }
 
-  // If neither secret is configured:
-  //   • Development — let the request through so developers can test without config
-  //   • Production  — return 503 instead of crashing or silently returning 401
+  // If neither secret is configured and not in dev:
   if (!cronSecret && !agentsApiKey) {
-    if (isDev) {
-      return NextResponse.next();
-    }
     return NextResponse.json(
       {
         error: 'Not configured',
@@ -62,26 +65,25 @@ export function middleware(request: NextRequest) {
     );
   }
 
-  const providedCron   = request.headers.get('x-cron-secret')  ?? '';
-  const providedApiKey = request.headers.get('x-api-key')      ?? '';
-
-  const validCron   = cronSecret   && providedCron   === cronSecret;
-  const validApiKey = agentsApiKey && providedApiKey === agentsApiKey;
-
-  if (!validCron && !validApiKey) {
-    return NextResponse.json(
-      {
-        error: 'Unauthorized',
-        message: 'Missing or invalid authentication credentials.',
-        hint: isDev
-          ? 'In dev, set CRON_SECRET or AGENTS_API_KEY in .env.local and pass them via x-cron-secret / x-api-key headers.'
-          : 'Check your API key.',
-      },
-      { status: 401 }
-    );
+  // If WorkOS environment variables are configured, use WorkOS AuthKit
+  if (process.env.WORKOS_CLIENT_ID && process.env.WORKOS_API_KEY) {
+    const authMiddleware = authkitMiddleware({
+      debug: process.env.NODE_ENV === 'development',
+    });
+    return authMiddleware(request);
   }
 
-  return NextResponse.next();
+  // Fallback: unauthorized
+  return NextResponse.json(
+    {
+      error: 'Unauthorized',
+      message: 'Missing or invalid authentication credentials.',
+      hint: isDev
+        ? 'In dev, set CRON_SECRET or AGENTS_API_KEY in .env.local and pass them via x-cron-secret / x-api-key headers.'
+        : 'Check your API key.',
+    },
+    { status: 401 }
+  );
 }
 
 export const config = {
