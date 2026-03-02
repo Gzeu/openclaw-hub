@@ -403,14 +403,45 @@ export default function AgentsPage() {
     setMessages((m) => [...m, userMsg])
     setChatLoading(true)
     try {
-      const res = await api.chatWithAgent(selectedAgent.key, input)
+      const token = localStorage.getItem('auth-token')
+      const res = await fetch('/api/agents/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          sessionKey: selectedAgent.key,
+          text: input
+        }),
+      })
+      
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Failed to send message')
+      }
+      
       const reader = res.body?.getReader()
       if (!reader) throw new Error('No stream')
       let full = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        full += new TextDecoder().decode(value)
+        const chunk = new TextDecoder().decode(value)
+        // Parse SSE data
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.response) {
+                full += data.response
+              }
+            } catch (e) {
+              // Ignore parsing errors
+            }
+          }
+        }
       }
       const agentMsg: ChatMsg = {
         role: 'agent',
