@@ -2,9 +2,8 @@ import Link from 'next/link';
 import ProjectGrid from '@/components/ProjectGrid';
 
 const QUICK_LINKS = [
-  { href: '/login',       icon: '🔐', label: 'Login',       desc: 'Sign in to access configuration' },
-  { href: '/chat',       icon: '💬', label: 'Chat',        desc: 'AI chat with OpenRouter models' },
   { href: '/agents',      icon: '🤖', label: 'Agents',      desc: 'Real-time agent communications & delegations' },
+  { href: '/chat',       icon: '💬', label: 'Chat',        desc: 'AI chat with OpenRouter models' },
   { href: '/config',      icon: '⚙️', label: 'Config',      desc: 'User settings & API key management' },
   { href: '/activity',    icon: '📡', label: 'Activity',    desc: 'Real-time activity monitoring & logs' },
   { href: '/skills',      icon: '⚡', label: 'Skills',      desc: '25+ AI skills & free API integrations' },
@@ -71,14 +70,11 @@ export default async function Home() {
 
           {/* CTA */}
           <div className="flex flex-wrap items-center justify-center gap-3 mt-8 animate-fade-up" style={{ animationDelay: '0.16s' }}>
-            <Link href="/login" className="btn btn-primary">
-              🔐 Sign In
+            <Link href="/agents" className="btn btn-primary">
+              🤖 Explore Agents
             </Link>
             <Link href="/chat" className="btn btn-ghost">
               💬 Start Chat
-            </Link>
-            <Link href="/agents" className="btn btn-ghost">
-              🤖 Open Agents
             </Link>
             <Link href="/config" className="btn btn-ghost">
               ⚙️ Configure
@@ -140,9 +136,9 @@ export default async function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="card p-6">
             <div className="text-3xl mb-3">🔐</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: '#fff' }}>User Authentication</h3>
+            <h3 className="text-lg font-semibold mb-2" style={{ color: '#fff' }}>WorkOS Authentication</h3>
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Secure login/register with JWT tokens, role-based access control, and session management.
+              Enterprise-grade authentication with WorkOS AuthKit, Google OAuth, and secure session management.
             </p>
           </div>
           
@@ -216,9 +212,9 @@ export default async function Home() {
           /* Empty state — shown when DB is not configured */
           <div className="text-center py-20">
             <span className="text-5xl">🤖</span>
-            <p className="mt-4 font-semibold" style={{ color: '#fff' }}>OpenClaw Hub is Ready!</p>
+            <p className="mt-4 font-semibold" style={{ color: '#fff' }}>Welcome to OpenClaw Hub!</p>
             <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
-              Sign in to access configuration management, agent communications, and real-time monitoring. Check the{' '}
+              Explore AI agents, start chatting, and manage your configuration. Sign in with your Google account to access all features. Check the{' '}
               <a
                 href="https://github.com/Gzeu/openclaw-hub"
                 target="_blank"
@@ -230,14 +226,11 @@ export default async function Home() {
               {' '}for documentation.
             </p>
             <div className="flex justify-center gap-3 mt-6">
-              <Link href="/login" className="btn btn-primary">
-                🔐 Sign In to Start
+              <Link href="/agents" className="btn btn-primary">
+                🤖 Explore Agents
               </Link>
               <Link href="/chat" className="btn btn-ghost">
                 💬 Start Chatting
-              </Link>
-              <Link href="/agents" className="btn btn-ghost">
-                🤖 Explore Agents
               </Link>
               <Link href="/config" className="btn btn-ghost">
                 ⚙️ Configure Settings
