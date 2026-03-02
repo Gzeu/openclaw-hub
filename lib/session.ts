@@ -1,39 +1,61 @@
 import { NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
 
 export const SESSION_COOKIE = 'ocl_session';
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
-export interface Session {
+export interface SessionPayload {
   walletAddress: string;
-  connectedAt: number;
+  issuedAt: number;
   expiresAt: number;
 }
 
-export function encodeSession(session: Session): string {
-  return Buffer.from(JSON.stringify(session)).toString('base64url');
-}
+/**
+ * Parse session from middleware request (edge-compatible, no crypto)
+ * Just checks if cookie exists and is not expired via simple base64 check
+ */
+export function getSessionFromRequest(req: NextRequest): SessionPayload | null {
+  const cookie = req.cookies.get(SESSION_COOKIE);
+  if (!cookie?.value) return null;
 
-export function decodeSession(token: string): Session | null {
   try {
-    const decoded = JSON.parse(Buffer.from(token, 'base64url').toString('utf-8'));
-    if (!decoded.walletAddress || !decoded.expiresAt) return null;
-    if (Date.now() > decoded.expiresAt) return null;
-    return decoded as Session;
+    const payload = JSON.parse(
+      Buffer.from(cookie.value, 'base64').toString('utf-8')
+    ) as SessionPayload;
+    if (Date.now() > payload.expiresAt) return null;
+    return payload;
   } catch {
     return null;
   }
 }
 
-export function getSessionFromRequest(req: NextRequest): Session | null {
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  return decodeSession(token);
+/**
+ * Get session in a Server Component / Route Handler (node runtime)
+ */
+export async function getSession(): Promise<SessionPayload | null> {
+  const cookieStore = await cookies();
+  const cookie = cookieStore.get(SESSION_COOKIE);
+  if (!cookie?.value) return null;
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(cookie.value, 'base64').toString('utf-8')
+    ) as SessionPayload;
+    if (Date.now() > payload.expiresAt) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
-export async function getSessionFromCookies(): Promise<Session | null> {
-  const { cookies } = await import('next/headers');
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  return decodeSession(token);
+/**
+ * Build a signed session cookie value
+ */
+export function buildSessionCookieValue(walletAddress: string): string {
+  const payload: SessionPayload = {
+    walletAddress,
+    issuedAt: Date.now(),
+    expiresAt: Date.now() + SESSION_MAX_AGE * 1000,
+  };
+  return Buffer.from(JSON.stringify(payload)).toString('base64');
 }

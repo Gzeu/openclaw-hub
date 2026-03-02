@@ -1,59 +1,55 @@
 export type PluginCategory =
   | 'ai'
   | 'blockchain'
-  | 'developer'
   | 'communication'
-  | 'productivity'
+  | 'developer'
   | 'data'
-  | 'storage'
-  | 'monitoring'
-  | 'payment'
-  | 'social';
+  | 'productivity'
+  | 'social'
+  | 'finance'
+  | 'infrastructure'
+  | 'media'
+  | 'security';
 
-export type AuthType = 'api_key' | 'oauth2' | 'webhook' | 'none';
+export type AuthType = 'none' | 'apikey' | 'oauth2' | 'jwt';
 
-export interface PluginConfigField {
+export interface ConfigField {
   key: string;
   label: string;
-  type: 'text' | 'password' | 'url' | 'number' | 'boolean' | 'select';
+  type: 'text' | 'password' | 'url' | 'email' | 'select' | 'textarea';
   required: boolean;
+  isSecret: boolean;
   placeholder?: string;
   options?: string[];
-  isSecret?: boolean;
+  helpText?: string;
 }
 
 export interface NativePlugin {
   key: string;
   name: string;
+  icon: string;
   description: string;
   category: PluginCategory;
-  icon: string;
   authType: AuthType;
-  docsUrl?: string;
-  oauthScopes?: string[];
-  configFields: PluginConfigField[];
   capabilities: string[];
+  configFields: ConfigField[];
+  docsUrl?: string;
+  homepageUrl?: string;
   isOpenClawSkill: boolean;
-  skillSlug?: string;
+  skillSlug?: string; // ClawHub slug if this is also an OpenClaw skill
+  version: string;
 }
 
-export interface RegistrySkill {
-  slug: string;
-  name: string;
-  description: string;
-  author: string;
-  version: string;
-  tags: string[];
-  installCount?: number;
-  rating?: number;
-  repoUrl: string;
+export interface PluginCategoryMeta {
+  key: PluginCategory;
+  label: string;
+  icon: string;
 }
 
 export interface InstalledPlugin {
-  key: string;
-  type: 'native' | 'registry';
+  pluginKey: string;
   enabled: boolean;
   config: Record<string, string>;
   installedAt: number;
-  version?: string;
+  updatedAt: number;
 }

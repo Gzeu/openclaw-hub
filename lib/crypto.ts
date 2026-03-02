@@ -1,40 +1,49 @@
 /**
- * AES-GCM encryption using MASTER_KEY from environment.
- * Used to encrypt plugin secrets (API keys, OAuth tokens) before storing in Convex.
+ * AES-256-GCM encryption for plugin secrets.
+ * MASTER_KEY env var must be a 32-byte hex string (64 chars).
+ *
+ * Example generation:
+ *   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
  */
 
-const MASTER_KEY_HEX = process.env.MASTER_KEY ?? '';
+const ALGO = 'aes-256-gcm';
+const IV_LENGTH = 12; // 96-bit IV for GCM
+const TAG_LENGTH = 16;
 
-async function getKey(): Promise<CryptoKey> {
-  if (!MASTER_KEY_HEX || MASTER_KEY_HEX.length < 64) {
-    throw new Error('MASTER_KEY must be set as a 32-byte (64 hex chars) environment variable.');
-  }
-  const keyBuffer = Buffer.from(MASTER_KEY_HEX, 'hex');
-  return crypto.subtle.importKey(
-    'raw',
-    keyBuffer,
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt', 'decrypt']
-  );
+function getMasterKey(): Buffer {
+  const key = process.env.MASTER_KEY;
+  if (!key) throw new Error('MASTER_KEY env var is not set');
+  if (key.length !== 64) throw new Error('MASTER_KEY must be 64 hex chars (32 bytes)');
+  return Buffer.from(key, 'hex');
 }
 
 export async function encrypt(plaintext: string): Promise<string> {
-  const key = await getKey();
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(plaintext);
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
-  const out = new Uint8Array(12 + ciphertext.byteLength);
-  out.set(iv, 0);
-  out.set(new Uint8Array(ciphertext), 12);
-  return Buffer.from(out).toString('base64');
+  const crypto = await import('crypto');
+  const key = getMasterKey();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGO, key, iv, { authTagLength: TAG_LENGTH });
+
+  const encrypted = Buffer.concat([
+    cipher.update(plaintext, 'utf-8'),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+
+  // Format: iv(12) + tag(16) + ciphertext → base64
+  return Buffer.concat([iv, tag, encrypted]).toString('base64');
 }
 
-export async function decrypt(encryptedBase64: string): Promise<string> {
-  const key = await getKey();
-  const data = Buffer.from(encryptedBase64, 'base64');
-  const iv = data.subarray(0, 12);
-  const ciphertext = data.subarray(12);
-  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
-  return new TextDecoder().decode(plaintext);
+export async function decrypt(ciphertext: string): Promise<string> {
+  const crypto = await import('crypto');
+  const key = getMasterKey();
+  const buf = Buffer.from(ciphertext, 'base64');
+
+  const iv = buf.subarray(0, IV_LENGTH);
+  const tag = buf.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
+  const data = buf.subarray(IV_LENGTH + TAG_LENGTH);
+
+  const decipher = crypto.createDecipheriv(ALGO, key, iv, { authTagLength: TAG_LENGTH });
+  decipher.setAuthTag(tag);
+
+  return decipher.update(data) + decipher.final('utf-8');
 }
