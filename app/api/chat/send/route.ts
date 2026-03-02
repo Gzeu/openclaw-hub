@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ConvexHttpClient } from 'convex/browser'
 import { api } from '@/convex/_generated/api'
 
-const LITEROUTER_API_KEY = '57d9af92d7e95ebb9e93facc1ac54a059a38990d1607c1d4c584de10363ca7ec'
+const LITEROUTER_API_KEY = process.env.LITEROUTER_API_KEY || '57d9af92d7e95ebb9e93facc1ac54a059a38990d1607c1d4c584de10363ca7ec'
 const LITEROUTER_API_URL = 'https://api.literouter.com/v1/chat/completions'
 
 const MODELS = [
