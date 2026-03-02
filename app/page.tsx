@@ -1,245 +1,159 @@
-import Link from 'next/link';
-import ProjectGrid from '@/components/ProjectGrid';
+'use client'
 
-const QUICK_LINKS = [
-  { href: '/agents',      icon: '🤖', label: 'Agents',      desc: 'Real-time agent communications & delegations' },
-  { href: '/chat',       icon: '💬', label: 'Chat',        desc: 'AI chat with OpenRouter models' },
-  { href: '/config',      icon: '⚙️', label: 'Config',      desc: 'User settings & API key management' },
-  { href: '/activity',    icon: '📡', label: 'Activity',    desc: 'Real-time activity monitoring & logs' },
-  { href: '/skills',      icon: '⚡', label: 'Skills',      desc: '25+ AI skills & free API integrations' },
-  { href: '/api/health',  icon: '🛠️', label: 'API Tools',   desc: 'Health check & API monitoring' },
-  { href: '/dashboard',   icon: '📊', label: 'Dashboard',   desc: 'Analytics & performance metrics' },
-  { href: 'https://github.com/Gzeu/openclaw-hub', icon: '⭐', label: 'GitHub', desc: 'Source code & documentation' },
-];
+import { useState } from 'react'
+import Link from 'next/link'
+import { useQuery } from 'convex/react'
+import { api } from '../convex/_generated/api'
 
-async function getProjects() {
-  try {
-    // Dynamic import so a missing DB env never crashes the module
-    const { getAllProjects, getAllTags } = await import('@/lib/projects');
-    const [projects, allTags] = await Promise.all([getAllProjects(), getAllTags()]);
-    return { projects, allTags };
-  } catch {
-    // No DB configured or DB unreachable — render the page without project grid
-    return { projects: [], allTags: [] };
-  }
-}
+export default function Home() {
+  const tasks = useQuery(api.tasks.getTasks, {})
+  const activeAgents = useQuery(api.agents.getActiveAgents, {})
 
-export default async function Home() {
-  const { projects, allTags } = await getProjects();
+  const QUICK_LINKS = [
+    { href: '/agents',      icon: '🤖', label: 'Agents',      desc: 'Real-time agent communications & delegations' },
+    { href: '/chat',       icon: '💬', label: 'Chat',        desc: 'AI chat with OpenRouter models' },
+    { href: '/config',      icon: '⚙️', label: 'Config',      desc: 'User settings & API key management' },
+    { href: '/activity',    icon: '📡', label: 'Activity',    desc: 'Real-time activity monitoring & logs' },
+    { href: '/skills',      icon: '⚡', label: 'Skills',      desc: '25+ AI skills & free API integrations' },
+    { href: '/api/health',  icon: '🛠️', label: 'API Tools',   desc: 'Health check & API monitoring' },
+    { href: '/economy',     icon: '💰', label: 'Economy',     desc: 'Agent marketplace & task economy' },
+    { href: '/registry',    icon: '📋', label: 'Registry',    desc: 'Agent registry & profiles' },
+  ]
 
   return (
-    <div className="min-h-screen">
-
-      {/* ── HERO ───────────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        {/* Ambient orbs */}
-        <div
-          className="absolute top-[-120px] left-[-80px] w-[500px] h-[500px] rounded-full pointer-events-none animate-glow-pulse"
-          style={{ background: 'radial-gradient(circle, rgba(124,92,252,0.12) 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute top-[60px] right-[-60px] w-[380px] h-[380px] rounded-full pointer-events-none animate-glow-pulse"
-          style={{ background: 'radial-gradient(circle, rgba(16,217,138,0.07) 0%, transparent 70%)', animationDelay: '1.5s' }}
-        />
-
-        <div className="relative max-w-[1440px] mx-auto px-6 pt-20 pb-16">
-
-          {/* Version badge */}
-          <div className="flex justify-center mb-6 animate-fade-up">
-            <span className="badge badge-accent px-3 py-1.5">
-              🦾 OpenClaw Hub · v0.3.0
-            </span>
-          </div>
-
-          {/* Headline */}
-          <div className="text-center max-w-3xl mx-auto animate-fade-up" style={{ animationDelay: '0.08s' }}>
-            <h1 className="text-5xl sm:text-6xl font-black tracking-tight leading-[1.08] mb-5" style={{ color: '#fff' }}>
-              The{' '}
-              <span className="text-gradient">AI Agent</span>
-              {' '}Hub for
-              <br />
-              <span className="text-gradient" style={{ filter: 'hue-rotate(40deg)' }}>OpenClaw</span>
-            </h1>
-            <p className="text-lg sm:text-xl max-w-xl mx-auto leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              Real-time agent communications, configuration management, and activity monitoring. Built on{' '}
-              <span style={{ color: '#a78bfa' }}>Next.js 15</span>,{' '}
-              <span style={{ color: '#10d98a' }}>Convex</span> &amp;{' '}
-              <span style={{ color: '#22d3ee' }}>TypeScript</span>.
-            </p>
-          </div>
-
-          {/* CTA */}
-          <div className="flex flex-wrap items-center justify-center gap-3 mt-8 animate-fade-up" style={{ animationDelay: '0.16s' }}>
-            <Link href="/agents" className="btn btn-primary">
-              🤖 Explore Agents
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
+      {/* Header */}
+      <div className="border-b border-[#1a1a1a]">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">🦅 OpenClaw Hub</h1>
+              <p className="text-gray-400">AI Agent Platform & Automation Framework</p>
+            </div>
+            <Link 
+              href="/agents"
+              className="bg-[#23F7DD] text-black px-6 py-3 rounded-lg font-medium hover:bg-[#23F7DD]/90 transition-colors"
+            >
+              Launch Agents →
             </Link>
-            <Link href="/chat" className="btn btn-ghost">
-              💬 Start Chat
-            </Link>
-            <Link href="/config" className="btn btn-ghost">
-              ⚙️ Configure
-            </Link>
-            <a href="https://github.com/Gzeu/openclaw-hub" target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-              ⭐ GitHub
-            </a>
           </div>
+        </div>
+      </div>
 
-          {/* Stats */}
-          <div
-            className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto mt-12 animate-fade-up"
-            style={{ animationDelay: '0.24s' }}
-          >
-            {[
-              { label: 'Models',    value: '5',           icon: '🤖', color: '#a78bfa' },
-              { label: 'Skills',    value: '25+',         icon: '⚡', color: '#10d98a' },
-              { label: 'APIs',      value: '75+',         icon: '🔌', color: '#f59e0b' },
-              { label: 'Real-time', value: 'Live',        icon: '📡', color: '#22d3ee' },
-            ].map((s) => (
-              <div key={s.label} className="card p-4 text-center">
-                <div className="text-2xl mb-1">{s.icon}</div>
-                <div className="text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
-              </div>
+      {/* Stats */}
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+          <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6">
+            <div className="text-2xl mb-2">🤖</div>
+            <div className="text-2xl font-bold text-[#23F7DD]">
+              {activeAgents?.length || 0}
+            </div>
+            <div className="text-xs text-gray-500">Active Agents</div>
+          </div>
+          <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6">
+            <div className="text-2xl mb-2">⚡</div>
+            <div className="text-2xl font-bold text-[#23F7DD]">
+              {tasks?.length || 0}
+            </div>
+            <div className="text-xs text-gray-500">Tasks Running</div>
+          </div>
+          <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6">
+            <div className="text-2xl mb-2">🔗</div>
+            <div className="text-2xl font-bold text-[#23F7DD]">25+</div>
+            <div className="text-xs text-gray-500">AI Skills</div>
+          </div>
+          <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6">
+            <div className="text-2xl mb-2">🌐</div>
+            <div className="text-2xl font-bold text-[#23F7DD]">Multi</div>
+            <div className="text-xs text-gray-500">Protocol Support</div>
+          </div>
+        </div>
+
+        {/* Quick Links */}
+        <div className="mb-12">
+          <h2 className="text-xl font-semibold mb-6">Quick Access</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {QUICK_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6 hover:border-[#23F7DD]/50 transition-colors group"
+              >
+                <div className="text-2xl mb-3">{link.icon}</div>
+                <h3 className="font-semibold text-white mb-2 group-hover:text-[#23F7DD] transition-colors">
+                  {link.label}
+                </h3>
+                <p className="text-sm text-gray-400">{link.desc}</p>
+              </Link>
             ))}
           </div>
         </div>
-      </section>
 
-      {/* ── QUICK ACCESS ─────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1440px] mx-auto px-6 pb-10">
-        <div className="flex items-center gap-3 mb-5">
-          <span className="section-label">Quick Access</span>
-          <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-          {QUICK_LINKS.map(({ href, icon, label, desc }) => (
-            <Link
-              key={href}
-              href={href}
-              className="card card-glow flex flex-col items-center justify-center gap-1.5 p-4 text-center group transition-all duration-200 hover:-translate-y-0.5"
-            >
-              <span className="text-2xl transition-transform duration-200 group-hover:scale-110">{icon}</span>
-              <span className="text-sm font-semibold" style={{ color: '#fff' }}>{label}</span>
-              <span className="text-[10px] leading-tight" style={{ color: 'var(--text-dim)' }}>{desc}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ── FEATURES ───────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1440px] mx-auto px-6 pb-10">
-        <div className="flex items-center gap-3 mb-5">
-          <span className="section-label">Platform Features</span>
-          <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="card p-6">
-            <div className="text-3xl mb-3">🔐</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: '#fff' }}>WorkOS Authentication</h3>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Enterprise-grade authentication with WorkOS AuthKit, Google OAuth, and secure session management.
-            </p>
-          </div>
-          
-          <div className="card p-6">
-            <div className="text-3xl mb-3">💬</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: '#fff' }}>AI Chat Interface</h3>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Real-time chat with OpenRouter models including Claude, GPT-4, and Llama. Perfect for writers and professionals.
-            </p>
-          </div>
-          
-          <div className="card p-6">
-            <div className="text-3xl mb-3">🤖</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: '#fff' }}>Agent Communications</h3>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Real-time chat, agent delegations, message history, and multi-agent communication channels.
-            </p>
-          </div>
-          
-          <div className="card p-6">
-            <div className="text-3xl mb-3">⚙️</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: '#fff' }}>Configuration Management</h3>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              User settings, encrypted API key storage, provider registry, and model configuration.
-            </p>
-          </div>
-          
-          <div className="card p-6">
-            <div className="text-3xl mb-3">📡</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: '#fff' }}>Activity Logging</h3>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Real-time activity monitoring, audit trails, performance metrics, and filterable views.
-            </p>
-          </div>
-          
-          <div className="card p-6">
-            <div className="text-3xl mb-3">⚡</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: '#fff' }}>Skills Integration</h3>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              25+ AI skills, free API integrations, OpenRouter, Groq, Gemini, and more.
-            </p>
-          </div>
-          
-          <div className="card p-6">
-            <div className="text-3xl mb-3">📊</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: '#fff' }}>Real-time Dashboard</h3>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Live monitoring, performance metrics, cost tracking, and system health status.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ── PROJECTS ───────────────────────────────────────────────────────────────── */}
-      <div className="max-w-[1440px] mx-auto px-6">
-        <div className="flex items-center gap-3 mb-5">
-          <span className="section-label">
-            Projects{projects.length > 0 ? ` · ${projects.length} available` : ''}
-          </span>
-          <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
-          {projects.length > 0 && (
-            <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Filter by tag below</span>
-          )}
-        </div>
-      </div>
-
-      <div className="max-w-[1440px] mx-auto px-6 pb-16">
-        {projects.length > 0 ? (
-          <ProjectGrid projects={projects} allTags={allTags} />
-        ) : (
-          /* Empty state — shown when DB is not configured */
-          <div className="text-center py-20">
-            <span className="text-5xl">🤖</span>
-            <p className="mt-4 font-semibold" style={{ color: '#fff' }}>Welcome to OpenClaw Hub!</p>
-            <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
-              Explore AI agents, start chatting, and manage your configuration. Sign in with your Google account to access all features. Check the{' '}
-              <a
-                href="https://github.com/Gzeu/openclaw-hub"
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: '#a78bfa' }}
-              >
-                GitHub README
-              </a>
-              {' '}for documentation.
-            </p>
-            <div className="flex justify-center gap-3 mt-6">
-              <Link href="/agents" className="btn btn-primary">
-                🤖 Explore Agents
-              </Link>
-              <Link href="/chat" className="btn btn-ghost">
-                💬 Start Chatting
-              </Link>
-              <Link href="/config" className="btn btn-ghost">
-                ⚙️ Configure Settings
-              </Link>
+        {/* Features */}
+        <div className="mb-12">
+          <h2 className="text-xl font-semibold mb-6">Platform Features</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6">
+              <h3 className="font-semibold text-white mb-4">🤖 Agent Management</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>• Real-time agent communication</li>
+                <li>• Task delegation & automation</li>
+                <li>• Multi-protocol support (MCP, A2A, OASF)</li>
+                <li>• Agent registry & profiles</li>
+              </ul>
+            </div>
+            <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6">
+              <h3 className="font-semibold text-white mb-4">⚡ AI Integration</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>• 25+ AI skills & tools</li>
+                <li>• OpenRouter model support</li>
+                <li>• Custom agent creation</li>
+                <li>• Workflow automation</li>
+              </ul>
+            </div>
+            <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6">
+              <h3 className="font-semibold text-white mb-4">🔗 Blockchain Ready</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>• MultiversX integration</li>
+                <li>• ERC-8004 agent registry</li>
+                <li>• Smart contract interactions</li>
+                <li>• DeFi protocol support</li>
+              </ul>
+            </div>
+            <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6">
+              <h3 className="font-semibold text-white mb-4">📊 Monitoring</h3>
+              <ul className="space-y-2 text-gray-400">
+                <li>• Real-time activity logs</li>
+                <li>• Agent health monitoring</li>
+                <li>• Performance analytics</li>
+                <li>• API health checks</li>
+              </ul>
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
+        {/* CTA */}
+        <div className="bg-gradient-to-r from-[#23F7DD]/20 to-[#23F7DD]/10 border border-[#23F7DD]/30 rounded-xl p-8 text-center">
+          <h2 className="text-2xl font-bold text-white mb-4">Ready to Build AI Agents?</h2>
+          <p className="text-gray-400 mb-6">
+            Start creating intelligent automation systems with OpenClaw Hub's comprehensive agent platform.
+          </p>
+          <div className="flex gap-4 justify-center">
+            <Link 
+              href="/agents"
+              className="bg-[#23F7DD] text-black px-6 py-3 rounded-lg font-medium hover:bg-[#23F7DD]/90 transition-colors"
+            >
+              Get Started
+            </Link>
+            <Link 
+              href="https://github.com/Gzeu/openclaw-hub"
+              className="border border-[#23F7DD] text-[#23F7DD] px-6 py-3 rounded-lg font-medium hover:bg-[#23F7DD]/10 transition-colors"
+            >
+              View Documentation
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
-  );
+  )
 }
