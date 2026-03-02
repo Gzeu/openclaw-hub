@@ -1,14 +1,12 @@
 'use client'
 
-import { useUser } from '@workos-inc/authkit-react'
+import { useAuth } from '@workos-inc/authkit-react'
 
 export default function WorkOSAuth() {
-  const { user, signIn, signOut, isLoading } = useUser()
+  const { user, isLoading, signIn, signOut } = useAuth()
 
   const handleSignIn = () => {
-    signIn({
-      provider: 'google', // or any other provider you want to use
-    })
+    signIn()
   }
 
   const handleSignOut = () => {
