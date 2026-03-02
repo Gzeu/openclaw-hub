@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import Link from 'next/link';
 import './globals.css';
 import ConvexClientProvider from '@/components/ConvexProvider';
+import { AuthKitProvider } from '@workos-inc/authkit-react';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -131,9 +132,11 @@ export default function RootLayout({
 
         {/* ── Page content ───────────────────────────────────────────────────── */}
         <main style={{ minHeight: 'calc(100vh - 56px)' }}>
-          <ConvexClientProvider>
-            {children}
-          </ConvexClientProvider>
+          <AuthKitProvider clientId={process.env.WORKOS_CLIENT_ID!}>
+            <ConvexClientProvider>
+              {children}
+            </ConvexClientProvider>
+          </AuthKitProvider>
         </main>
 
         {/* ── Footer ─────────────────────────────────────────────────────────── */}

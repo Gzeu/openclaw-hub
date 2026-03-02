@@ -1,22 +1,26 @@
 /**
- * Next.js Middleware — API Route Protection
+ * Next.js Middleware — API Route Protection + WorkOS AuthKit
  *
  * Protects /api/agents/* routes. Accepts:
  *   - Header x-cron-secret = CRON_SECRET  (internal / cron calls)
  *   - Header x-api-key     = AGENTS_API_KEY (external agent calls)
+ *   - WorkOS AuthKit session cookies (authenticated users)
  *
  * When env vars are not configured, routes are left open in development
  * and return a clear 503 "not configured" response in production —
  * never a crash / white page.
- *
- * TODO: Replace with NextAuth.js session check once auth is wired up.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 const PUBLIC_AGENT_PATHS = [
   '/api/agents/status',
   '/api/agents/webhook',
 ];
+
+export default authkitMiddleware({
+  debug: process.env.NODE_ENV === 'development',
+});
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
