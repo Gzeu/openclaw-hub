@@ -7,10 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "next build",
-    "postbuild": "next-sitemap",
     "type-check": "tsc --noEmit",
-    "export": "next export"
+    "export": "next build && next export"
   },
   "dependencies": {
     "@e2b/code-interpreter": "^1.0.0",
