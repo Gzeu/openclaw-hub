@@ -9,7 +9,7 @@ import { ExtensionLoginButton, WebWalletLoginButton } from "@multiversx/sdk-dapp
 import { sendTransactions } from "@multiversx/sdk-dapp/services/transactions/sendTransactions";
 import { refreshAccount } from "@multiversx/sdk-dapp/utils/account/refreshAccount";
 import { useTrackTransactionStatus } from "@multiversx/sdk-dapp/hooks/transactions/useTrackTransactionStatus";
-import { buildDepositTransaction } from "@/utils/smartContract";
+import { buildDepositTransaction } from "../utils/smartContract";
 
 export default function Home() {
   const isLoggedIn = useGetIsLoggedIn();
@@ -79,7 +79,6 @@ export default function Home() {
       
       const taskId = await createTask({
         creatorAddress: address,
-        agentId: selectedAgentId as any,
         prompt,
         escrowAmount: amount,
       });
@@ -322,7 +321,7 @@ export default function Home() {
             )}
           </div>
         </section>
-      </div>
+      </main>
     </div>
   );
 }

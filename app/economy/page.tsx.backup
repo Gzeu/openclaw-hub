@@ -1,0 +1,869 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import type { GigListing, LoopResult, EarnedIncome } from '@/lib/agent-economy'
+
+type ExecutionStep = 'scanning' | 'selecting' | 'executing' | 'generating' | 'submitting' | 'completed' | 'error'
+type ExecutionLog = {
+  timestamp: number
+  step: ExecutionStep
+  message: string
+  details?: string
+}
+type LoopConfig = {
+  minKarma: number
+  maxRetries: number
+  retryDelay: number
+  enableAutoRetry: boolean
+  preferredPlatforms: string[]
+}
+type ErrorType = 'auth' | 'network' | 'api' | 'sandbox' | 'content' | 'unknown'
+type ErrorInfo = {
+  type: ErrorType
+  message: string
+  suggestion: string
+  recoverable: boolean
+}
+
+const PLATFORMS = [
+  { id: 'thecolony', name: 'The Colony', url: 'https://thecolony.cc', color: '#7c3aed', icon: '🏛️', currency: 'karma + sats' },
+  { id: 'moltverr', name: 'Moltverr', url: 'https://www.moltverr.com', color: '#0891b2', icon: '💼', currency: 'USD/crypto' },
+  { id: 'opentask', name: 'OpenTask', url: 'https://opentask.ai', color: '#059669', icon: '📋', currency: 'USD $5–$400' },
+  { id: 'ugig', name: 'ugig.net', url: 'https://ugig.net', color: '#d97706', icon: '🔗', currency: 'SOL/ETH/USDC' },
+]
+
+export default function EconomyPage() {
+  const [tasks, setTasks] = useState<{ platform: string; count: number; tasks: GigListing[] }[]>([])
+  const [loopResult, setLoopResult] = useState<LoopResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [loopRunning, setLoopRunning] = useState(false)
+  const [activeTab, setActiveTab] = useState<'tasks' | 'earnings' | 'loop'>('tasks')
+  const [earnings, setEarnings] = useState<{ karma: number; sats: number; egld: number }>({ karma: 0, sats: 0, egld: 0 })
+  const [incomeHistory, setIncomeHistory] = useState<EarnedIncome[]>([])
+  const [executionLogs, setExecutionLogs] = useState<ExecutionLog[]>([])
+  const [currentStep, setCurrentStep] = useState<ExecutionStep | null>(null)
+  const [loopConfig, setLoopConfig] = useState<LoopConfig>({
+    minKarma: 5,
+    maxRetries: 3,
+    retryDelay: 5000,
+    enableAutoRetry: true,
+    preferredPlatforms: ['thecolony', 'moltverr']
+  })
+  const [executionHistory, setExecutionHistory] = useState<LoopResult[]>([])
+  const [showConfig, setShowConfig] = useState(false)
+  const [taskFilters, setTaskFilters] = useState({
+    minBudget: 0,
+    platforms: [] as string[],
+    sortBy: 'budget' as 'budget' | 'title' | 'platform',
+    sortOrder: 'desc' as 'asc' | 'desc'
+  })
+  const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null)
+
+  useEffect(() => {
+    fetchTasks()
+    fetchEarnings()
+  }, [])
+
+  async function fetchEarnings() {
+    try {
+      const colonyKey = localStorage.getItem('colony_api_key') ?? ''
+      const res = await fetch('/api/agents/loop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'income',
+          agent: {
+            id: 'openclaw-main',
+            name: 'OpenClaw Main Agent',
+            capabilities: ['code-analysis', 'data-research', 'technical-writing'],
+            colonyApiKey: colonyKey,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (data.ok && data.data) {
+        const { total } = data.data
+        const karma = total.find((e: EarnedIncome) => e.platform === 'thecolony')
+        const sats = total.find((e: EarnedIncome) => e.currency === 'sats')
+        const egld = total.find((e: EarnedIncome) => e.currency === 'EGLD')
+
+        setEarnings({
+          karma: karma ? parseInt(karma.amount) : 0,
+          sats: sats ? parseInt(sats.amount) : 0,
+          egld: egld ? parseFloat(egld.amount) : 0,
+        })
+        setIncomeHistory(total)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function fetchTasks() {
+    setLoading(true)
+    try {
+      const colonyKey = localStorage.getItem('colony_api_key') ?? ''
+      const url = `/api/agents/tasks?limit=8${colonyKey ? `&colonyKey=${encodeURIComponent(colonyKey)}` : ''}`
+      const res = await fetch(url)
+      const data = await res.json()
+      if (data.ok) setTasks(data.platforms ?? [])
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addExecutionLog = useCallback((step: ExecutionStep, message: string, details?: string) => {
+    const log: ExecutionLog = {
+      timestamp: Date.now(),
+      step,
+      message,
+      details
+    }
+    setExecutionLogs(prev => [...prev, log])
+    setCurrentStep(step)
+  }, [])
+
+  const clearExecutionLogs = useCallback(() => {
+    setExecutionLogs([])
+    setCurrentStep(null)
+    setErrorInfo(null)
+  }, [])
+
+  const analyzeError = useCallback((error: string): ErrorInfo => {
+    const lowerError = error.toLowerCase()
+    
+    // Authentication errors
+    if (lowerError.includes('unauthorized') || lowerError.includes('401') || lowerError.includes('api key') || lowerError.includes('token')) {
+      return {
+        type: 'auth',
+        message: 'Authentication failed',
+        suggestion: 'Check your Colony API key configuration and ensure it\'s valid and has proper permissions.',
+        recoverable: true
+      }
+    }
+    
+    // Network errors
+    if (lowerError.includes('network') || lowerError.includes('fetch') || lowerError.includes('timeout') || lowerError.includes('connection')) {
+      return {
+        type: 'network',
+        message: 'Network connectivity issue',
+        suggestion: 'Check your internet connection and try again. If the issue persists, the platform may be temporarily unavailable.',
+        recoverable: true
+      }
+    }
+    
+    // API errors
+    if (lowerError.includes('400') || lowerError.includes('403') || lowerError.includes('404') || lowerError.includes('500') || lowerError.includes('api')) {
+      return {
+        type: 'api',
+        message: 'Platform API error',
+        suggestion: 'The platform API returned an error. This may be due to rate limiting or platform issues. Try again later.',
+        recoverable: true
+      }
+    }
+    
+    // Sandbox errors
+    if (lowerError.includes('sandbox') || lowerError.includes('e2b') || lowerError.includes('execution')) {
+      return {
+        type: 'sandbox',
+        message: 'Sandbox execution failed',
+        suggestion: 'The code execution environment encountered an error. This may be due to resource limits or code issues.',
+        recoverable: true
+      }
+    }
+    
+    // Content generation errors
+    if (lowerError.includes('openrouter') || lowerError.includes('ai') || lowerError.includes('generation')) {
+      return {
+        type: 'content',
+        message: 'AI content generation failed',
+        suggestion: 'The AI model failed to generate content. Check your OpenRouter API key and try again.',
+        recoverable: true
+      }
+    }
+    
+    // Unknown errors
+    return {
+      type: 'unknown',
+      message: 'Unexpected error occurred',
+      suggestion: 'An unexpected error occurred. Check the logs for more details and try again.',
+      recoverable: false
+    }
+  }, [])
+
+  async function triggerLoop() {
+    setLoopRunning(true)
+    setLoopResult(null)
+    clearExecutionLogs()
+
+    try {
+      const colonyApiKey = localStorage.getItem('colony_api_key') ?? ''
+
+      addExecutionLog('scanning', 'Starting agent loop execution...')
+
+      const res = await fetch('/api/agents/loop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'run',
+          config: loopConfig,
+          agent: {
+            id: 'openclaw-main',
+            name: 'OpenClaw Main Agent',
+            capabilities: ['code-analysis', 'data-research', 'technical-writing'],
+            colonyApiKey,
+          },
+        }),
+      })
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+      }
+
+      const data = await res.json()
+
+      if (data.ok) {
+        setLoopResult(data.data)
+        setExecutionHistory(prev => [data.data, ...prev.slice(0, 9)])
+        addExecutionLog('completed', 'Loop execution completed successfully', `Status: ${data.data.status}`)
+      } else {
+        throw new Error(data.error || 'Unknown error occurred')
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorAnalysis = analyzeError(errorMessage)
+      
+      addExecutionLog('error', 'Loop execution failed', errorMessage)
+      setErrorInfo(errorAnalysis)
+      
+      setLoopResult({
+        agentId: 'openclaw-main',
+        platform: 'error',
+        taskId: '',
+        taskTitle: '',
+        outputPreview: '',
+        executionMs: 0,
+        status: 'error',
+        error: errorMessage
+      })
+    } finally {
+      setLoopRunning(false)
+      setCurrentStep(null)
+    }
+  }
+
+  const totalTasks = tasks.reduce((s, p) => s + p.count, 0)
+
+  // Filter and sort tasks
+  const filteredAndSortedTasks = tasks.map(platform => {
+    const filteredTasks = platform.tasks.filter(task => {
+      const budgetNum = parseFloat(task.budget.replace(/[^0-9.]/g, ''))
+      const budgetMatch = budgetNum >= taskFilters.minBudget
+      const platformMatch = taskFilters.platforms.length === 0 || taskFilters.platforms.includes(platform.platform)
+      return budgetMatch && platformMatch
+    })
+
+    const sortedTasks = [...filteredTasks].sort((a, b) => {
+      let comparison = 0
+      
+      if (taskFilters.sortBy === 'budget') {
+        const aBudget = parseFloat(a.budget.replace(/[^0-9.]/g, ''))
+        const bBudget = parseFloat(b.budget.replace(/[^0-9.]/g, ''))
+        comparison = aBudget - bBudget
+      } else if (taskFilters.sortBy === 'title') {
+        comparison = a.title.localeCompare(b.title)
+      } else if (taskFilters.sortBy === 'platform') {
+        comparison = a.platform.localeCompare(b.platform)
+      }
+      
+      return taskFilters.sortOrder === 'asc' ? comparison : -comparison
+    })
+
+    return { ...platform, tasks: sortedTasks, count: sortedTasks.length }
+  })
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white p-6">
+      {/* Header */}
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-1">
+            🤖 Agent Economy
+          </h1>
+          <p className="text-gray-400 text-sm">
+            Agenții tăi muncesc autonom pe platformele din ecosistem și câștigă karma, sats, și crypto.
+          </p>
+        </div>
+
+        {/* Platform Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          {PLATFORMS.map((p) => {
+            const platformData = tasks.find((t) => t.platform === p.id)
+            return (
+              <a
+                key={p.id}
+                href={p.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-[#111] border border-[#222] rounded-xl p-4 hover:border-[#333] transition-colors group"
+              >
+                <div className="text-2xl mb-2">{p.icon}</div>
+                <div className="font-semibold text-sm text-white">{p.name}</div>
+                <div className="text-xs text-gray-500 mt-1">{p.currency}</div>
+                {platformData && (
+                  <div
+                    className="mt-2 text-xs font-bold"
+                    style={{ color: p.color }}
+                  >
+                    {platformData.count} tasks open
+                  </div>
+                )}
+              </a>
+            )
+          })}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 bg-[#111] rounded-lg p-1 w-fit">
+          {(['tasks', 'loop', 'earnings'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === tab
+                  ? 'bg-[#23F7DD] text-black'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {tab === 'tasks' ? `📋 Tasks (${totalTasks})` : tab === 'loop' ? '⚡ Run Loop' : '💰 Earnings'}
+            </button>
+          ))}
+        </div>
+
+        {/* Tasks Tab */}
+        {activeTab === 'tasks' && (
+          <div className="space-y-6">
+            {/* Task Filters */}
+            <div className="bg-[#111] border-[#1e1e1e] rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-white">🔍 Task Filters</h3>
+                <button
+                  onClick={() => setTaskFilters({ minBudget: 0, platforms: [], sortBy: 'budget', sortOrder: 'desc' })}
+                  className="text-xs text-gray-400 hover:text-gray-300 transition-colors"
+                >
+                  Reset Filters
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Min Budget</label>
+                  <input
+                    type="number"
+                    value={taskFilters.minBudget}
+                    onChange={(e) => setTaskFilters(prev => ({ ...prev, minBudget: parseFloat(e.target.value) || 0 }))}
+                    className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white"
+                    min="0"
+                    step="10"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Sort By</label>
+                  <select
+                    value={taskFilters.sortBy}
+                    onChange={(e) => setTaskFilters(prev => ({ ...prev, sortBy: e.target.value as any }))}
+                    className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white"
+                  >
+                    <option value="budget">Budget</option>
+                    <option value="title">Title</option>
+                    <option value="platform">Platform</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Order</label>
+                  <select
+                    value={taskFilters.sortOrder}
+                    onChange={(e) => setTaskFilters(prev => ({ ...prev, sortOrder: e.target.value as any }))}
+                    className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white"
+                  >
+                    <option value="desc">Descending</option>
+                    <option value="asc">Ascending</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Platforms</label>
+                  <div className="space-y-1">
+                    {PLATFORMS.map(platform => (
+                      <label key={platform.id} className="flex items-center gap-2 text-xs text-gray-400">
+                        <input
+                          type="checkbox"
+                          checked={taskFilters.platforms.includes(platform.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setTaskFilters(prev => ({ ...prev, platforms: [...prev.platforms, platform.id] }))
+                            } else {
+                              setTaskFilters(prev => ({ ...prev, platforms: prev.platforms.filter(p => p !== platform.id) }))
+                            }
+                          }}
+                          className="bg-[#0d0d0d] border border-[#2a2a2a] rounded"
+                        />
+                        {platform.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Task Listings */}
+            {loading ? (
+              <div className="text-gray-500 text-sm">Loading tasks from all platforms...</div>
+            ) : filteredAndSortedTasks.length === 0 || filteredAndSortedTasks.every(p => p.tasks.length === 0) ? (
+              <div className="text-gray-600 text-sm">
+                {taskFilters.minBudget > 0 || taskFilters.platforms.length > 0 
+                  ? 'No tasks match your filters. Try adjusting them.' 
+                  : 'No tasks loaded. Configure your Colony API key to see live dispatches.'}
+              </div>
+            ) : (
+              filteredAndSortedTasks.map((platform) => (
+                <div key={platform.platform}>
+                  <div className="text-xs text-gray-500 uppercase tracking-wider mb-3">
+                    {platform.platform} — {platform.count} open {platform.count !== tasks.find(p => p.platform === platform.platform)?.count && '(filtered)'}
+                  </div>
+                  <div className="grid gap-3">
+                    {platform.tasks.slice(0, 5).map((task) => (
+                      <div
+                        key={task.id}
+                        className="bg-[#111] border border-[#1e1e1e] rounded-xl p-4 hover:border-[#2a2a2a] transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm text-white truncate">
+                              {task.title}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                              {task.description}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-sm font-bold text-[#23F7DD]">
+                              {task.budget} {task.currency}
+                            </div>
+                            <a
+                              href={task.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                            >
+                              view →
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+            <button
+              onClick={fetchTasks}
+              className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+            >
+              ↻ Refresh
+            </button>
+          </div>
+        )}
+
+        {/* Loop Tab */}
+        {activeTab === 'loop' && (
+          <div className="space-y-6">
+            {/* Configuration Panel */}
+            <div className="bg-[#111] border-[#1e1e1e] rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-white">⚙️ Loop Configuration</h2>
+                <button
+                  onClick={() => setShowConfig(!showConfig)}
+                  className="text-xs text-gray-400 hover:text-gray-300 transition-colors"
+                >
+                  {showConfig ? 'Hide' : 'Show'} Settings
+                </button>
+              </div>
+              
+              {showConfig && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Minimum Karma</label>
+                    <input
+                      type="number"
+                      value={loopConfig.minKarma}
+                      onChange={(e) => setLoopConfig(prev => ({ ...prev, minKarma: parseInt(e.target.value) || 0 }))}
+                      className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white"
+                      min="1"
+                      max="100"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Max Retries</label>
+                    <input
+                      type="number"
+                      value={loopConfig.maxRetries}
+                      onChange={(e) => setLoopConfig(prev => ({ ...prev, maxRetries: parseInt(e.target.value) || 0 }))}
+                      className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white"
+                      min="0"
+                      max="5"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Retry Delay (ms)</label>
+                    <input
+                      type="number"
+                      value={loopConfig.retryDelay}
+                      onChange={(e) => setLoopConfig(prev => ({ ...prev, retryDelay: parseInt(e.target.value) || 1000 }))}
+                      className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white"
+                      min="1000"
+                      max="30000"
+                      step="1000"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="autoRetry"
+                      checked={loopConfig.enableAutoRetry}
+                      onChange={(e) => setLoopConfig(prev => ({ ...prev, enableAutoRetry: e.target.checked }))}
+                      className="bg-[#0d0d0d] border border-[#2a2a2a] rounded"
+                    />
+                    <label htmlFor="autoRetry" className="text-xs text-gray-400">Enable Auto Retry</label>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Main Loop Control */}
+            <div className="bg-[#111] border-[#1e1e1e] rounded-xl p-6">
+              <h2 className="font-semibold text-white mb-2">⚡ Autonomous Agent Loop</h2>
+              <p className="text-sm text-gray-400 mb-4">
+                Agentul scanează platformele, preia cel mai bun task disponibil, îl execută în E2B sandbox, livrează rezultatul și câștigă karma/sats.
+                În producție, rulează automat la fiecare 15 minute via Vercel Cron.
+              </p>
+              <div className="bg-[#0d0d0d] rounded-lg p-3 text-xs font-mono text-gray-500 mb-4">
+                <div>1. Scan TheColony dispatches (karma ≥ {loopConfig.minKarma})</div>
+                <div>2. Fallback → Moltverr gigs</div>
+                <div>3. Execute in E2B Python sandbox</div>
+                <div>4. Generate AI report via OpenRouter</div>
+                <div>5. Submit → earn karma + sell doc for 500 sats</div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={triggerLoop}
+                  disabled={loopRunning}
+                  className="px-6 py-2.5 bg-[#23F7DD] text-black font-semibold rounded-lg text-sm hover:bg-[#1de0c8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loopRunning ? '⏳ Running...' : '▶ Run Agent Loop Now'}
+                </button>
+                {executionLogs.length > 0 && (
+                  <button
+                    onClick={clearExecutionLogs}
+                    className="px-4 py-2.5 bg-[#333] text-gray-300 font-medium rounded-lg text-sm hover:bg-[#444] transition-colors"
+                  >
+                    Clear Logs
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Real-time Execution Logs */}
+            {executionLogs.length > 0 && (
+              <div className="bg-[#111] border-[#1e1e1e] rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-white">📋 Execution Logs</h3>
+                  {currentStep && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-[#23F7DD] rounded-full animate-pulse"></div>
+                      <span className="text-xs text-gray-400 capitalize">{currentStep}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {executionLogs.map((log, idx) => (
+                    <div key={idx} className="flex items-start gap-3 text-sm">
+                      <div className="flex-shrink-0 w-16 text-xs text-gray-500 font-mono">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </div>
+                      <div className="flex-shrink-0">
+                        {log.step === 'scanning' && '🔍'}
+                        {log.step === 'selecting' && '🎯'}
+                        {log.step === 'executing' && '⚡'}
+                        {log.step === 'generating' && '🧠'}
+                        {log.step === 'submitting' && '📤'}
+                        {log.step === 'completed' && '✅'}
+                        {log.step === 'error' && '❌'}
+                      </div>
+                      <div className="flex-1">
+                        <div className={`font-medium ${
+                          log.step === 'error' ? 'text-red-400' : 
+                          log.step === 'completed' ? 'text-[#23F7DD]' : 
+                          'text-white'
+                        }`}>
+                          {log.message}
+                        </div>
+                        {log.details && (
+                          <div className="text-xs text-gray-500 mt-1 font-mono">{log.details}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Enhanced Error Display */}
+            {errorInfo && loopResult?.status === 'error' && (
+              <div className="bg-[#111] border border-red-500/30 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">❌</span>
+                  <span className="font-semibold text-white">Error Analysis</span>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      errorInfo.type === 'auth' ? 'bg-orange-500' :
+                      errorInfo.type === 'network' ? 'bg-blue-500' :
+                      errorInfo.type === 'api' ? 'bg-purple-500' :
+                      errorInfo.type === 'sandbox' ? 'bg-yellow-500' :
+                      errorInfo.type === 'content' ? 'bg-pink-500' :
+                      'bg-red-500'
+                    }`}></div>
+                    <span className="text-sm font-medium text-white capitalize">{errorInfo.type} Error</span>
+                    {errorInfo.recoverable && (
+                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">Recoverable</span>
+                    )}
+                  </div>
+                  
+                  <div className="text-sm text-gray-300">
+                    {errorInfo.message}
+                  </div>
+                  
+                  <div className="bg-[#0d0d0d] rounded-lg p-3">
+                    <div className="text-xs text-gray-500 mb-1">Suggested Action:</div>
+                    <div className="text-sm text-gray-300">{errorInfo.suggestion}</div>
+                  </div>
+                  
+                  {errorInfo.recoverable && (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setErrorInfo(null)
+                          setTimeout(() => triggerLoop(), 1000)
+                        }}
+                        className="px-4 py-2 bg-[#23F7DD] text-black font-medium rounded-lg text-sm hover:bg-[#1de0c8] transition-colors"
+                      >
+                        🔄 Retry
+                      </button>
+                      <button
+                        onClick={() => setErrorInfo(null)}
+                        className="px-4 py-2 bg-[#333] text-gray-300 font-medium rounded-lg text-sm hover:bg-[#444] transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Loop Result */}
+            {loopResult && (
+              <div
+                className={`bg-[#111] border rounded-xl p-6 ${
+                  loopResult.status === 'success'
+                    ? 'border-[#23F7DD]/30'
+                    : loopResult.status === 'no_tasks'
+                    ? 'border-yellow-500/30'
+                    : 'border-red-500/30'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-xl">
+                    {loopResult.status === 'success'
+                      ? '✅'
+                      : loopResult.status === 'no_tasks'
+                      ? '⚠️'
+                      : '❌'}
+                  </span>
+                  <span className="font-semibold text-white">
+                    {loopResult.status === 'success'
+                      ? 'Task completed'
+                      : loopResult.status === 'no_tasks'
+                      ? 'No tasks available'
+                      : 'Error'}
+                  </span>
+                  <span className="ml-auto text-xs text-gray-600">
+                    {loopResult.executionMs}ms
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  {loopResult.taskTitle && (
+                    <div>
+                      <span className="text-gray-500">Task: </span>
+                      <span className="text-white">{loopResult.taskTitle}</span>
+                    </div>
+                  )}
+                  {loopResult.platform && loopResult.platform !== 'error' && (
+                    <div>
+                      <span className="text-gray-500">Platform: </span>
+                      <span className="text-[#23F7DD]">{loopResult.platform}</span>
+                    </div>
+                  )}
+                  {loopResult.karmaEarned !== undefined && (
+                    <div>
+                      <span className="text-gray-500">Karma earned: </span>
+                      <span className="text-yellow-400">+{loopResult.karmaEarned} karma</span>
+                    </div>
+                  )}
+                  {loopResult.docSold && (
+                    <div>
+                      <span className="text-gray-500">Doc sold: </span>
+                      <a
+                        href={loopResult.docSold.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#23F7DD] hover:underline"
+                      >
+                        {loopResult.docSold.priceSats} sats →
+                      </a>
+                    </div>
+                  )}
+                  {loopResult.outputPreview && (
+                    <div className="mt-3">
+                      <div className="text-xs text-gray-500 mb-1">Output preview:</div>
+                      <div className="bg-[#0d0d0d] rounded-lg p-3 text-xs text-gray-400 font-mono whitespace-pre-wrap">
+                        {loopResult.outputPreview}
+                      </div>
+                    </div>
+                  )}
+                  {loopResult.error && (
+                    <div className="mt-3">
+                      <div className="text-xs text-gray-500 mb-1">Error Details:</div>
+                      <div className="bg-[#0d0d0d] rounded-lg p-3 text-xs text-red-400 font-mono">
+                        {loopResult.error}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Execution History */}
+            {executionHistory.length > 0 && (
+              <div className="bg-[#111] border-[#1e1e1e] rounded-xl p-6">
+                <h3 className="font-semibold text-white mb-4">📈 Execution History</h3>
+                <div className="space-y-3">
+                  {executionHistory.map((result, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-[#0d0d0d] rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${
+                          result.status === 'success' ? 'bg-[#23F7DD]' :
+                          result.status === 'no_tasks' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}></div>
+                        <div>
+                          <div className="text-sm text-white font-medium">
+                            {result.taskTitle || 'No task'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {result.platform} • {result.executionMs}ms
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {result.karmaEarned && (
+                          <div className="text-sm text-yellow-400 font-medium">
+                            +{result.karmaEarned} karma
+                          </div>
+                        )}
+                        {result.docSold && (
+                          <div className="text-xs text-[#23F7DD]">
+                            {result.docSold.priceSats} sats
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Earnings Tab */}
+        {activeTab === 'earnings' && (
+          <div className="space-y-4">
+            <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-6">
+              <h2 className="font-semibold text-white mb-4">💰 Income Overview</h2>
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { label: 'TheColony Karma', value: earnings.karma.toString(), sub: 'From completed tasks', color: '#7c3aed' },
+                  { label: 'Lightning Sats', value: earnings.sats.toString(), sub: 'From doc sales', color: '#f59e0b' },
+                  { label: 'EGLD Earned', value: earnings.egld.toFixed(2), sub: 'Internal tasks', color: '#23F7DD' },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="bg-[#0d0d0d] rounded-xl p-4 border border-[#1a1a1a]"
+                  >
+                    <div className="text-xs text-gray-500 mb-1">{stat.label}</div>
+                    <div
+                      className="text-2xl font-bold"
+                      style={{ color: stat.color }}
+                    >
+                      {stat.value}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">{stat.sub}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-4">
+              <div className="text-xs text-gray-500 mb-3">Setup Guide</div>
+              <div className="space-y-2 text-sm text-gray-400">
+                <div>1. Register agent on TheColony via the Loop tab</div>
+                <div>2. Save your Colony API key in localStorage (key: <code className="text-[#23F7DD] bg-[#0d0d0d] px-1 rounded">colony_api_key</code>)</div>
+                <div>3. Add <code className="text-[#23F7DD] bg-[#0d0d0d] px-1 rounded">COLONY_AGENT_API_KEY</code> to Vercel env vars</div>
+                <div>4. Enable Vercel Cron for <code className="text-[#23F7DD] bg-[#0d0d0d] px-1 rounded">/api/cron/agent-loop</code></div>
+              </div>
+            </div>
+            
+            {/* Income History */}
+            {incomeHistory.length > 0 && (
+              <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-4">
+                <div className="text-xs text-gray-500 mb-3">Recent Income</div>
+                <div className="space-y-2">
+                  {incomeHistory.slice(0, 5).map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[#23F7DD]"></div>
+                        <span className="text-gray-400">{item.platform}</span>
+                        <span className="text-white truncate max-w-[200px]">{item.taskTitle}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-white font-medium">{item.amount} {item.currency}</div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(item.timestamp).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+        )}
+      </div>
+    </div>
+  )
+}

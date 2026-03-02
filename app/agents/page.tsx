@@ -573,7 +573,7 @@ export default function AgentsPage() {
             <span className="font-bold text-white tracking-tight">OpenClaw Hub</span>
           </a>
           <nav className="flex gap-1">
-            {[['/', 'Projects'], ['/agents', 'Agents'], ['/chat', 'Chat']].map(([href, label]) => (
+            {[['/', 'Projects'], ['/agents', 'Agents'], ['/registry', 'Registry'], ['/chat', 'Chat']].map(([href, label]) => (
               <a
                 key={href}
                 href={href}

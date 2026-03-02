@@ -478,8 +478,8 @@ export const SKILLS: Skill[] = [
     inputs: [
       { name: 'action', type: 'string', required: true, description: 'Action: status, check, auto-unlock, force-unlock, cleanup', example: 'status' },
       { name: 'sessionKey', type: 'string', required: false, description: 'Specific session key for check/unlock actions', example: 'agent:default:main' },
-      { name: 'maxAgeMinutes', type: 'number', required: false, description: 'Maximum age in minutes for auto-unlock', example: 5 },
-      { name: 'maxAgeHours', type: 'number', required: false, description: 'Maximum age in hours for cleanup', example: 24 }
+      { name: 'maxAgeMinutes', type: 'number', required: false, description: 'Maximum age in minutes for auto-unlock', example: '5' },
+      { name: 'maxAgeHours', type: 'number', required: false, description: 'Maximum age in hours for cleanup', example: '24' }
     ],
     outputs: [
       { name: 'stuckLocks', type: 'array', description: 'List of stuck session locks with age and PID info' },

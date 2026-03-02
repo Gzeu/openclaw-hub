@@ -1,0 +1,629 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// OPENCLAW HUB — Agent Health Monitoring System
+// Automated agent status checking with real-time monitoring
+// ═══════════════════════════════════════════════════════════════════════════
+
+import { NextRequest, NextResponse } from 'next/server'
+import type { AgentProfile } from '@/lib/agent-profiles'
+
+export const runtime = 'edge'
+
+interface HealthCheckResult {
+  agent_id: string
+  status: 'healthy' | 'degraded' | 'unhealthy'
+  score: number
+  checks: HealthCheck[]
+  timestamp: string
+  duration: number
+}
+
+interface HealthCheck {
+  name: string
+  status: 'pass' | 'fail' | 'warn'
+  message: string
+  response_time?: number
+  details?: any
+}
+
+interface AgentEndpoint {
+  name: string
+  url: string
+  protocol: string
+  version?: string
+  status: 'active' | 'inactive' | 'error'
+  last_checked?: string
+  response_time?: number
+}
+
+// Health check configurations for different protocols
+const HEALTH_CHECK_CONFIGS = {
+  'MCP': {
+    timeout: 5000,
+    expectedStatus: 200,
+    checks: ['connectivity', 'version', 'tools', 'resources']
+  },
+  'A2A': {
+    timeout: 5000,
+    expectedStatus: 200,
+    checks: ['connectivity', 'version', 'skills']
+  },
+  'OASF': {
+    timeout: 5000,
+    expectedStatus: 200,
+    checks: ['connectivity', 'version', 'skills', 'domains']
+  },
+  'Web': {
+    timeout: 10000,
+    expectedStatus: 200,
+    checks: ['connectivity', 'content']
+  },
+  'API': {
+    timeout: 5000,
+    expectedStatus: 200,
+    checks: ['connectivity', 'api_version']
+  }
+}
+
+// Perform HTTP health check
+async function performHTTPHealthCheck(url: string, config: any): Promise<HealthCheck> {
+  const startTime = Date.now()
+  
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), config.timeout)
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'OpenClaw-Hub-Health-Checker/1.0'
+      }
+    })
+    
+    clearTimeout(timeoutId)
+    const responseTime = Date.now() - startTime
+    
+    if (response.status === config.expectedStatus) {
+      return {
+        name: 'connectivity',
+        status: 'pass',
+        message: `Endpoint is accessible (${response.status})`,
+        response_time
+      }
+    } else {
+      return {
+        name: 'connectivity',
+        status: 'fail',
+        message: `Unexpected status: ${response.status}`,
+        response_time
+      }
+    }
+  } catch (error) {
+    const responseTime = Date.now() - startTime
+    return {
+      name: 'connectivity',
+      status: 'fail',
+      message: `Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      response_time
+    }
+  }
+}
+
+// Perform MCP-specific health check
+async function performMCPHealthCheck(endpoint: string): Promise<HealthCheck[]> {
+  const checks: HealthCheck[] = []
+  
+  try {
+    // Check basic connectivity
+    const connectivityCheck = await performHTTPHealthCheck(endpoint, HEALTH_CHECK_CONFIGS.MCP)
+    checks.push(connectivityCheck)
+    
+    // Check MCP version
+    try {
+      const versionResponse = await fetch(`${endpoint}/version`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      
+      if (versionResponse.ok) {
+        const version = await versionResponse.text()
+        checks.push({
+          name: 'version',
+          status: 'pass',
+          message: `MCP version: ${version.trim()}`
+        })
+      } else {
+        checks.push({
+          name: 'version',
+          status: 'warn',
+          message: 'Could not fetch MCP version'
+        })
+      }
+    } catch (error) {
+      checks.push({
+        name: 'version',
+        status: 'fail',
+        message: `Version check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    }
+    
+    // Check tools availability
+    try {
+      const toolsResponse = await fetch(`${endpoint}/tools/list`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      
+      if (toolsResponse.ok) {
+        const tools = await toolsResponse.json()
+        checks.push({
+          name: 'tools',
+          status: 'pass',
+          message: `Available tools: ${tools.length}`,
+          details: { tools }
+        })
+      } else {
+        checks.push({
+          name: 'tools',
+          status: 'warn',
+          message: 'Could not fetch tools list'
+        })
+      }
+    } catch (error) {
+      checks.push({
+        name: 'tools',
+        status: 'fail',
+        message: `Tools check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    }
+    
+    // Check resources availability
+    try {
+      const resourcesResponse = await fetch(`${endpoint}/resources/list`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      
+      if (resourcesResponse.ok) {
+        const resources = await resourcesResponse.json()
+        checks.push({
+          name: 'resources',
+          status: 'pass',
+          message: `Available resources: ${resources.length}`,
+          details: { resources }
+        })
+      } else {
+        checks.push({
+          name: 'resources',
+          status: 'warn',
+          message: 'Could not fetch resources list'
+        })
+      }
+    } catch (error) {
+      checks.push({
+        name: 'resources',
+        status: 'fail',
+        message: `Resources check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    }
+    
+  } catch (error) {
+    checks.push({
+      name: 'mcp_general',
+      status: 'fail',
+      message: `MCP health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    })
+  }
+  
+  return checks
+}
+
+// Perform A2A-specific health check
+async function performA2AHealthCheck(endpoint: string): Promise<HealthCheck[]> {
+  const checks: HealthCheck[] = []
+  
+  try {
+    // Check basic connectivity
+    const connectivityCheck = await performHTTPHealthCheck(endpoint, HEALTH_CHECK_CONFIGS.A2A)
+    checks.push(connectivityCheck)
+    
+    // Check A2A version
+    try {
+      const versionResponse = await fetch(`${endpoint}/version`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      
+      if (versionResponse.ok) {
+        const version = await versionResponse.text()
+        checks.push({
+          name: 'version',
+          status: 'pass',
+          message: `A2A version: ${version.trim()}`
+        })
+      } else {
+        checks.push({
+          name: 'version',
+          status: 'warn',
+          message: 'Could not fetch A2A version'
+        })
+      }
+    } catch (error) {
+      checks.push({
+        name: 'version',
+        status: 'fail',
+        message: `Version check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    }
+    
+    // Check skills
+    try {
+      const skillsResponse = await fetch(`${endpoint}/skills`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      
+      if (skillsResponse.ok) {
+        const skills = await skillsResponse.json()
+        checks.push({
+          name: 'skills',
+          status: 'pass',
+          message: `Available skills: ${skills.length}`,
+          details: { skills }
+        })
+      } else {
+        checks.push({
+          name: 'skills',
+          status: 'warn',
+          message: 'Could not fetch skills list'
+        })
+      }
+    } catch (error) {
+      checks.push({
+        name: 'skills',
+        status: 'fail',
+        message: `Skills check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    }
+    
+  } catch (error) {
+    checks.push({
+      name: 'a2a_general',
+      status: 'fail',
+      message: `A2A health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    })
+  }
+  
+  return checks
+}
+
+// Perform Web-specific health check
+async function performWebHealthCheck(endpoint: string): Promise<HealthCheck[]> {
+  const checks: HealthCheck[] = []
+  
+  try {
+    // Check basic connectivity
+    const connectivityCheck = await performHTTPHealthCheck(endpoint, HEALTH_CHECKS.Web)
+    checks.push(connectivityCheck)
+    
+    // Check content accessibility
+    try {
+      const contentResponse = await fetch(endpoint, {
+        method: 'GET',
+        signal: AbortSignal.timeout(10000)
+      })
+      
+      if (contentResponse.ok) {
+        const content = await contentResponse.text()
+        checks.push({
+          name: 'content',
+          status: 'pass',
+          message: `Content accessible (${content.length} bytes)`,
+          details: { content_length: content.length }
+        })
+      } else {
+        checks.push({
+          name: 'content',
+          status: 'fail',
+          message: `Content not accessible (status: ${contentResponse.status})`
+        })
+      }
+    } catch (error) {
+      checks.push({
+        name: 'content',
+        status: 'fail',
+        message: `Content check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    }
+    
+  } catch (error) {
+    checks.push({
+      name: 'web_general',
+      status: 'fail',
+      message: `Web health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    })
+  }
+  
+  return checks
+}
+
+// Calculate overall health score
+function calculateHealthScore(checks: HealthCheck[]): number {
+  if (checks.length === 0) return 0
+  
+  const statusWeights = {
+    pass: 100,
+    warn: 50,
+    fail: 0
+  }
+  
+  const totalScore = checks.reduce((sum, check) => sum + statusWeights[check.status], 0)
+  return Math.round(totalScore / checks.length)
+}
+
+// Determine overall health status
+function determineHealthStatus(score: number): 'healthy' | 'degraded' | 'unhealthy' {
+  if (score >= 80) return 'healthy'
+  if (score >= 50) return 'degraded'
+  return 'unhealthy'
+}
+
+// Perform comprehensive health check for an agent
+async function performAgentHealthCheck(agent: AgentProfile): Promise<HealthCheckResult> {
+  const startTime = Date.now()
+  const allChecks: HealthCheck[] = []
+  
+  // Check each supported protocol
+  for (const protocol of agent.supported_protocols) {
+    const service = agent.services[protocol.toLowerCase()]
+    if (!service || !service.endpoint) {
+      allChecks.push({
+        name: `${protocol}_endpoint`,
+        status: 'warn',
+        message: `No endpoint configured for ${protocol}`
+      })
+      continue
+    }
+    
+    let protocolChecks: HealthCheck[] = []
+    
+    switch (protocol) {
+      case 'MCP':
+        protocolChecks = await performMCPHealthCheck(service.endpoint)
+        break
+      case 'A2A':
+        protocolChecks = await performA2AHealthCheck(service.endpoint)
+        break
+      case 'Web':
+        protocolChecks = await performWebHealthCheck(service.endpoint)
+        break
+      default:
+        // Generic HTTP check for unknown protocols
+        protocolChecks = [await performHTTPHealthCheck(service.endpoint, HEALTH_CHECKS.API)]
+        break
+    }
+    
+    allChecks.push(...protocolChecks)
+  }
+  
+  // Add general checks
+  allChecks.push({
+    name: 'agent_metadata',
+    status: agent.name && agent.description ? 'pass' : 'warn',
+    message: 'Agent metadata completeness check'
+  })
+  
+  allChecks.push({
+    name: 'protocols_configured',
+    status: agent.supported_protocols.length > 0 ? 'pass' : 'warn',
+    message: `Configured protocols: ${agent.supported_protocols.length}`
+  })
+  
+  const score = calculateHealthScore(allChecks)
+  const status = determineHealthStatus(score)
+  const duration = Date.now() - startTime
+  
+  return {
+    agent_id: agent.id,
+    status,
+    score,
+    checks: allChecks,
+    timestamp: new Date().toISOString(),
+    duration
+  }
+}
+
+// POST /api/agents/health/check - Perform health check on specific agent
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    
+    if (!body.agent_id) {
+      return NextResponse.json({
+        success: false,
+        error: {
+          code: 'MISSING_AGENT_ID',
+          message: 'Agent ID is required'
+        }
+      }, { status: 400 })
+    }
+    
+    // Mock agent data - replace with actual database query
+    const mockAgent: AgentProfile = {
+      id: body.agent_id,
+      name: 'Test Agent',
+      description: 'Test agent for health checking',
+      supported_protocols: body.protocols || ['MCP', 'Web'],
+      services: {
+        mcp: {
+          name: 'mcp',
+          endpoint: body.endpoints?.mcp || 'https://api.example.com/mcp',
+          version: '1.0.0'
+        },
+        web: {
+          name: 'web',
+          endpoint: body.endpoints?.web || 'https://api.example.com'
+        }
+      }
+    } as AgentProfile
+    
+    const healthResult = await performAgentHealthCheck(mockAgent)
+    
+    return NextResponse.json({
+      success: true,
+      data: healthResult,
+      meta: {
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        requestId: Math.random().toString(36).substring(7)
+      }
+    })
+  } catch (error) {
+    console.error('Health check failed:', error)
+    return NextResponse.json({
+      success: false,
+      error: {
+        code: 'HEALTH_CHECK_FAILED',
+        message: 'Health check failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      meta: {
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        requestId: Math.random().toString(36).substring(7)
+      }
+    }, { status: 500 })
+  }
+}
+
+// GET /api/agents/health/status - Get health status of all agents
+export async function GET(request: NextRequest) {
+  try {
+    // Mock agents data - replace with actual database query
+    const mockAgents: AgentProfile[] = [
+      {
+        id: '1',
+        name: 'Twilight Nexus',
+        supported_protocols: ['MCP', 'A2A', 'Web'],
+        services: {
+          mcp: {
+            name: 'mcp',
+            endpoint: 'https://api.celonova.xyz/mcp',
+            version: '2025-03-26'
+          },
+          a2a: {
+            name: 'a2a',
+            endpoint: 'https://api.celonova.xyz/.well-known/agent-card.json',
+            version: '0.3.0'
+          },
+          web: {
+            name: 'web',
+            endpoint: 'https://celonova.xyz/agent/645'
+          }
+        }
+      },
+      {
+        id: '2',
+        name: 'Nova Synopsis',
+        supported_protocols: ['MCP', 'Web'],
+        services: {
+          mcp: {
+            name: 'mcp',
+            endpoint: 'https://api.celonova.xyz/mcp',
+            version: '2025-03-26'
+          },
+          web: {
+            name: 'web',
+            endpoint: 'https://celonova.xyz/agent/644'
+          }
+        }
+      }
+    ] as AgentProfile[]
+    
+    const healthResults = await Promise.all(
+      mockAgents.map(agent => performAgentHealthCheck(agent))
+    )
+    
+    // Calculate overall statistics
+    const totalAgents = healthResults.length
+    const healthyAgents = healthResults.filter(r => r.status === 'healthy').length
+    const degradedAgents = healthResults.filter(r => r.status === 'degraded').length
+    const unhealthyAgents = healthResults.filter(r => r.status === 'unhealthy').length
+    const averageScore = healthResults.reduce((sum, r) => sum + r.score, 0) / totalAgents
+    
+    return NextResponse.json({
+      success: true,
+      data: {
+        summary: {
+          total_agents: totalAgents,
+          healthy_agents: healthyAgents,
+          degraded_agents: degradedAgents,
+          unhealthy_agents: unhealthyAgents,
+          average_score: Math.round(averageScore),
+          last_checked: new Date().toISOString()
+        },
+        agents: healthResults
+      },
+      meta: {
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        requestId: Math.random().toString(36).substring(7)
+      }
+    })
+  } catch (error) {
+    console.error('Failed to get health status:', error)
+    return NextResponse.json({
+      success: false,
+      error: {
+        code: 'HEALTH_STATUS_FAILED',
+        message: 'Failed to get health status',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      meta: {
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        requestId: Math.random().toString(36).substring(7)
+      }
+    }, { status: 500 })
+  }
+}
+
+// GET /api/agents/health/config - Get health check configuration
+export async function GET_CONFIG(request: NextRequest) {
+  try {
+    return NextResponse.json({
+      success: true,
+      data: {
+        health_check_configs: HEALTH_CHECK_CONFIGS,
+        supported_protocols: Object.keys(HEALTH_CHECK_CONFIGS),
+        default_timeout: 5000,
+        check_intervals: {
+          realtime: 300000, // 5 minutes
+          frequent: 900000,  // 15 minutes
+          normal: 3600000,   // 1 hour
+          infrequent: 86400000 // 24 hours
+        }
+      },
+      meta: {
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        requestId: Math.random().toString(36).substring(7)
+      }
+    })
+  } catch (error) {
+    console.error('Failed to get health config:', error)
+    return NextResponse.json({
+      success: false,
+      error: {
+        code: 'CONFIG_FAILED',
+        message: 'Failed to get health configuration',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      meta: {
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        requestId: Math.random().toString(36).substring(7)
+      }
+    }, { status: 500 })
+  }
+}

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "vercel-build": "next build",
+    "postbuild": "next-sitemap",
+    "type-check": "tsc --noEmit",
+    "export": "next export"
   },
   "dependencies": {
     "@e2b/code-interpreter": "^1.0.0",
@@ -21,6 +25,7 @@
     "@workos-inc/authkit-react": "^0.16.0",
     "bcryptjs": "^3.0.3",
     "convex": "^1.32.0",
+    "ethers": "^6.16.0",
     "gray-matter": "^4.0.3",
     "js-yaml": "^4.1.1",
     "jsonwebtoken": "^9.0.3",

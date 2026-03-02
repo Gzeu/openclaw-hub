@@ -33,8 +33,41 @@ NEXT_PUBLIC_WORKOS_CLIENT_ID="client_01KJP26KEG1ZEG6QJNFD7C2JES"
 WORKOS_CLIENT_ID="client_01KJP26KEG1ZEG6QJNFD7C2JES"
 WORKOS_API_KEY="[YOUR_WORKOS_API_KEY]"
 WORKOS_SECRET_KEY="[YOUR_WORKOS_SECRET_KEY]"
-WORKOS_REDIRECT_URI="http://localhost:3000/auth/callback"
+NEXT_PUBLIC_WORKOS_REDIRECT_URI="http://localhost:3000/auth/callback"
 WORKOS_COOKIE_SECRET="your-workos-cookie-secret-here"
+```
+
+### 3. Fix the Callback Route
+Make sure your `/app/auth/callback/route.ts` uses the correct redirect URI:
+
+```typescript
+export const GET = handleAuth({
+  returnPathname: '/agents',
+  onSuccess: async ({ user }) => {
+    console.log('User successfully authenticated:', user.email)
+    return NextResponse.redirect(new URL('/agents', 'http://localhost:3000'))
+  },
+  onError: async (error) => {
+    console.error('Authentication error:', error)
+    console.error('Error details:', JSON.stringify(error, null, 2))
+    
+    // Check if it's a redirect URI error
+    if (error.message && error.message.includes('redirect URI')) {
+      return NextResponse.json({
+        error: 'Redirect URI configuration error',
+        message: 'Please add http://localhost:3000/auth/callback to WorkOS dashboard Redirect URIs',
+        details: 'Check WorkOS dashboard → Configuration → Redirect URIs',
+        fix: 'Add both http://localhost:3000 and http://localhost:3000/auth/callback to your WorkOS Redirect URIs'
+      }, { status: 400 })
+    }
+    
+    return NextResponse.json({
+      error: 'Authentication failed',
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
+      details: error instanceof Error ? error.stack : 'No error details available'
+    }, { status: 500 })
+  }
+})
 ```
 
 ## 🎯 **Test After Configuration**
@@ -53,11 +86,12 @@ WORKOS_COOKIE_SECRET="your-workos-cookie-secret-here"
 ## 🔍 **Troubleshooting**
 
 If you still see the redirect URI error:
-1. Double-check the URLs in WorkOS dashboard
-2. Ensure no trailing slashes
+1. Double-check the URLs in WorkOS dashboard - they must match EXACTLY
+2. Ensure no trailing slashes unless specified
 3. Make sure both `http://localhost:3000` and `http://localhost:3000/auth/callback` are added
 4. Wait 1-2 minutes for WorkOS to propagate changes
 5. Restart your development server
+6. Clear browser cookies and cache
 
 ## 📱 **Production URLs**
 
@@ -72,3 +106,12 @@ After setup, you should see:
 - Sign In button: "Sign In with Google"
 - Successful Google OAuth flow
 - User profile display after login
+
+## 🔗 **Quick Fix Steps**
+
+1. Go to WorkOS Dashboard → Your App → Redirect URIs
+2. Add: `http://localhost:3000`
+3. Add: `http://localhost:3000/auth/callback`
+4. Save
+5. Restart dev server
+6. Try login again

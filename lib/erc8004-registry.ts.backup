@@ -1,0 +1,541 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// OPENCLAW HUB — ERC-8004 Agent Ownership Integration
+// Smart contract integration for agent tokenization and ownership
+// ═══════════════════════════════════════════════════════════════════════════
+
+import { ethers } from 'ethers'
+import type { AgentProfile } from '@/lib/agent-profiles'
+
+// ERC-8004 Agent Registry Contract ABI
+const ERC8004_REGISTRY_ABI = [
+  // Read functions
+  "function agentInfo(uint256 tokenId) view returns (string name, string description, string image, address owner, bool active)",
+  "function ownerOf(uint256 tokenId) view returns (address owner)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+  "function tokenByIndex(uint256 index) view returns (uint256)",
+  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
+  "function isApprovedForAll(address owner, address operator) view returns (bool)",
+  "function getApproved(uint256 tokenId) view returns (address)",
+  
+  // Write functions
+  "function mintAgent(address to, string name, string description, string image, string metadataURI) returns (uint256)",
+  "function updateAgent(uint256 tokenId, string name, string description, string image, string metadataURI)",
+  "function transferFrom(address from, address to, uint256 tokenId)",
+  "function approve(address to, uint256 tokenId)",
+  "function setApprovalForAll(address operator, bool approved)",
+  "function burn(uint256 tokenId)",
+  
+  // Events
+  "event AgentMinted(uint256 indexed tokenId, address indexed to, string name, string description)",
+  "event AgentUpdated(uint256 indexed tokenId, string name, string description)",
+  "event AgentTransferred(uint256 indexed from, uint256 indexed to, uint256 indexed tokenId)",
+  "event AgentBurned(uint256 indexed tokenId)",
+  "event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId)",
+  "event ApprovalForAll(address indexed owner, address indexed operator, bool approved)"
+]
+
+// ERC-8004 Agent Contract ABI (for individual agents)
+const ERC8004_AGENT_ABI = [
+  // Agent capabilities
+  "function execute(bytes calldata data) external returns (bytes memory result)",
+  "function updateEndpoint(string endpoint) external",
+  "function updateMetadata(string metadataURI) external",
+  "function pause() external",
+  "function unpause() external",
+  
+  // Agent information
+  "function endpoint() view returns (string)",
+  "function metadataURI() view returns (string)",
+  "function owner() view returns (address)",
+  "function paused() view returns (bool)",
+  "function version() view returns (string)",
+  
+  // Events
+  "event EndpointUpdated(string oldEndpoint, string newEndpoint)",
+  "event MetadataUpdated(string oldMetadataURI, string newMetadataURI)",
+  "event Paused(address account)",
+  "event Unpaused(address account)",
+  "event Executed(address indexed caller, bytes data, bytes result)"
+]
+
+export interface ERC8004AgentConfig {
+  registryAddress: string
+  chainId: number
+  rpcUrl: string
+  privateKey?: string
+}
+
+export interface AgentMetadata {
+  name: string
+  description: string
+  image: string
+  external_url?: string
+  attributes?: AgentAttribute[]
+  services?: AgentService[]
+  capabilities?: string[]
+  protocols?: string[]
+}
+
+export interface AgentAttribute {
+  trait_type: string
+  value: string | number
+}
+
+export interface AgentService {
+  name: string
+  endpoint: string
+  version: string
+  protocol: string
+}
+
+export class ERC8004AgentRegistry {
+  private provider: ethers.JsonRpcProvider
+  private registryContract: ethers.Contract
+  private config: ERC8004AgentConfig
+
+  constructor(config: ERC8004AgentConfig) {
+    this.config = config
+    this.provider = new ethers.JsonRpcProvider(config.rpcUrl)
+    this.registryContract = new ethers.Contract(
+      config.registryAddress,
+      ERC8004_REGISTRY_ABI,
+      this.provider
+    )
+  }
+
+  // Get agent information by token ID
+  async getAgentInfo(tokenId: number): Promise<{
+    name: string
+    description: string
+    image: string
+    owner: string
+    active: boolean
+  }> {
+    try {
+      const [name, description, image, owner, active] = await this.registryContract.agentInfo(tokenId)
+      return { name, description, image, owner, active }
+    } catch (error) {
+      throw new Error(`Failed to get agent info: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Get owner of an agent token
+  async getAgentOwner(tokenId: number): Promise<string> {
+    try {
+      return await this.registryContract.ownerOf(tokenId)
+    } catch (error) {
+      throw new Error(`Failed to get agent owner: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Get all agents owned by an address
+  async getAgentsByOwner(owner: string): Promise<number[]> {
+    try {
+      const balance = await this.registryContract.balanceOf(owner)
+      const tokenIds = []
+      
+      for (let i = 0; i < balance; i++) {
+        const tokenId = await this.registryContract.tokenOfOwnerByIndex(owner, i)
+        tokenIds.push(Number(tokenId))
+      }
+      
+      return tokenIds
+    } catch (error) {
+      throw new Error(`Failed to get agents by owner: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Get total supply of agent tokens
+  async getTotalSupply(): Promise<number> {
+    try {
+      const totalSupply = await this.registryContract.totalSupply()
+      return Number(totalSupply)
+    } catch (error) {
+      throw new Error(`Failed to get total supply: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Mint a new agent token
+  async mintAgent(
+    to: string,
+    name: string,
+    description: string,
+    image: string,
+    metadataURI: string,
+    signer?: ethers.Signer
+  ): Promise<number> {
+    try {
+      const contract = new ethers.Contract(
+        this.config.registryAddress,
+        ERC8004_REGISTRY_ABI,
+        signer || this.provider
+      )
+
+      const tx = await contract.mintAgent(to, name, description, image, metadataURI)
+      const receipt = await tx.wait()
+      
+      // Extract token ID from the event
+      const event = receipt.logs
+        .map((log: any) => {
+          try {
+            return this.registryContract.interface.parseLog(log)
+          } catch {
+            return null
+          }
+        })
+        .find((event: any) => event?.name === 'AgentMinted')
+
+      if (!event) {
+        throw new Error('AgentMinted event not found in transaction receipt')
+      }
+
+      return Number(event.args.tokenId)
+    } catch (error) {
+      throw new Error(`Failed to mint agent: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Update agent metadata
+  async updateAgent(
+    tokenId: number,
+    name: string,
+    description: string,
+    image: string,
+    metadataURI: string,
+    signer?: ethers.Signer
+  ): Promise<void> {
+    try {
+      const contract = new ethers.Contract(
+        this.config.registryAddress,
+        ERC8004_REGISTRY_ABI,
+        signer || this.provider
+      )
+
+      const tx = await contract.updateAgent(tokenId, name, description, image, metadataURI)
+      await tx.wait()
+    } catch (error) {
+      throw new Error(`Failed to update agent: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Transfer agent token
+  async transferAgent(
+    from: string,
+    to: string,
+    tokenId: number,
+    signer?: ethers.Signer
+  ): Promise<void> {
+    try {
+      const contract = new ethers.Contract(
+        this.config.registryAddress,
+        ERC8004_REGISTRY_ABI,
+        signer || this.provider
+      )
+
+      const tx = await contract.transferFrom(from, to, tokenId)
+      await tx.wait()
+    } catch (error) {
+      throw new Error(`Failed to transfer agent: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Burn agent token
+  async burnAgent(tokenId: number, signer?: ethers.Signer): Promise<void> {
+    try {
+      const contract = new ethers.Contract(
+        this.config.registryAddress,
+        ERC8004_REGISTRY_ABI,
+        signer || this.provider
+      )
+
+      const tx = await contract.burn(tokenId)
+      await tx.wait()
+    } catch (error) {
+      throw new Error(`Failed to burn agent: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Check if an address owns an agent
+  async ownsAgent(address: string, tokenId: number): Promise<boolean> {
+    try {
+      const owner = await this.getAgentOwner(tokenId)
+      return owner.toLowerCase() === address.toLowerCase()
+    } catch (error) {
+      return false
+    }
+  }
+
+  // Get agent metadata URI
+  async getAgentMetadataURI(tokenId: number): Promise<string> {
+    try {
+      // This would typically be stored in the agent contract
+      // For now, we'll construct a standard URI
+      return `https://api.openclaw-hub.com/agents/${tokenId}/metadata`
+    } catch (error) {
+      throw new Error(`Failed to get metadata URI: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Create metadata JSON for agent
+  createAgentMetadata(agent: AgentProfile): AgentMetadata {
+    return {
+      name: agent.name,
+      description: agent.description || '',
+      image: agent.image_url || '',
+      external_url: `https://openclaw-hub.com/registry/${agent.id}`,
+      attributes: [
+        {
+          trait_type: 'Chain ID',
+          value: agent.chain_id
+        },
+        {
+          trait_type: 'Token ID',
+          value: agent.token_id
+        },
+        {
+          trait_type: 'Total Score',
+          value: agent.total_score
+        },
+        {
+          trait_type: 'Health Status',
+          value: agent.health_status
+        },
+        {
+          trait_type: 'Is Verified',
+          value: agent.is_verified
+        },
+        {
+          trait_type: 'Is Active',
+          value: agent.is_active
+        },
+        ...(agent.categories.length > 0 && [{
+          trait_type: 'Categories',
+          value: agent.categories.join(', ')
+        }]),
+        ...(agent.tags.length > 0 && [{
+          trait_type: 'Tags',
+          value: agent.tags.join(', ')
+        }])
+      ].filter(Boolean),
+      services: agent.supported_protocols.map(protocol => ({
+        name: protocol,
+        endpoint: agent.services[protocol.toLowerCase()]?.endpoint || '',
+        version: agent.services[protocol.toLowerCase()]?.version || '1.0.0',
+        protocol
+      })),
+      capabilities: agent.capabilities,
+      protocols: agent.supported_protocols
+    }
+  }
+
+  // Listen to agent events
+  onAgentMinted(callback: (tokenId: number, to: string, name: string, description: string) => void): void {
+    this.registryContract.on('AgentMinted', (tokenId, to, name, description) => {
+      callback(Number(tokenId), to, name, description)
+    })
+  }
+
+  onAgentUpdated(callback: (tokenId: number, name: string, description: string) => void): void {
+    this.registryContract.on('AgentUpdated', (tokenId, name, description) => {
+      callback(Number(tokenId), name, description)
+    })
+  }
+
+  onAgentTransferred(callback: (from: string, to: string, tokenId: number) => void): void {
+    this.registryContract.on('AgentTransferred', (from, to, tokenId) => {
+      callback(from, to, Number(tokenId))
+    })
+  }
+
+  // Get contract information
+  async getContractInfo(): Promise<{
+    address: string
+    chainId: number
+    totalSupply: number
+  }> {
+    try {
+      const [address, chainId, totalSupply] = await Promise.all([
+        Promise.resolve(this.registryContract.target as string),
+        this.provider.getNetwork().then(network => Number(chainId)),
+        this.getTotalSupply()
+      ])
+
+      return { address, chainId, totalSupply }
+    } catch (error) {
+      throw new Error(`Failed to get contract info: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+}
+
+// Individual Agent Contract Interaction
+export class ERC8004Agent {
+  private agentContract: ethers.Contract
+  private provider: ethers.JsonRpcProvider
+
+  constructor(agentAddress: string, rpcUrl: string) {
+    this.provider = new ethers.JsonRpcProvider(rpcUrl)
+    this.agentContract = new ethers.Contract(agentAddress, ERC8004_AGENT_ABI, this.provider)
+  }
+
+  // Execute agent function
+  async execute(data: string, signer?: ethers.Signer): Promise<string> {
+    try {
+      const contract = new ethers.Contract(
+        this.agentContract.target as string,
+        ERC8004_AGENT_ABI,
+        signer || this.provider
+      )
+
+      const result = await contract.execute(ethers.toUtf8Bytes(data))
+      return ethers.toUtf8String(result)
+    } catch (error) {
+      throw new Error(`Failed to execute agent: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Get agent endpoint
+  async getEndpoint(): Promise<string> {
+    try {
+      return await this.agentContract.endpoint()
+    } catch (error) {
+      throw new Error(`Failed to get endpoint: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Update agent endpoint
+  async updateEndpoint(endpoint: string, signer?: ethers.Signer): Promise<void> {
+    try {
+      const contract = new ethers.Contract(
+        this.agentContract.target as string,
+        ERC8004_AGENT_ABI,
+        signer || this.provider
+      )
+
+      const tx = await contract.updateEndpoint(endpoint)
+      await tx.wait()
+    } catch (error) {
+      throw new Error(`Failed to update endpoint: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Get agent metadata URI
+  async getMetadataURI(): Promise<string> {
+    try {
+      return await this.agentContract.metadataURI()
+    } catch (error) {
+      throw new Error(`Failed to get metadata URI: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Check if agent is paused
+  async isPaused(): Promise<boolean> {
+    try {
+      return await this.agentContract.paused()
+    } catch (error) {
+      throw new Error(`Failed to check pause status: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Pause agent
+  async pause(signer?: ethers.Signer): Promise<void> {
+    try {
+      const contract = new ethers.Contract(
+        this.agentContract.target as string,
+        ERC8004_AGENT_ABI,
+        signer || this.provider
+      )
+
+      const tx = await contract.pause()
+      await tx.wait()
+    } catch (error) {
+      throw new Error(`Failed to pause agent: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Unpause agent
+  async unpause(signer?: ethers.Signer): Promise<void> {
+    try {
+      const contract = new ethers.Contract(
+        this.agentContract.target as string,
+        ERC8004_AGENT_ABI,
+        signer || this.provider
+      )
+
+      const tx = await contract.unpause()
+      await tx.wait()
+    } catch (error) {
+      throw new Error(`Failed to unpause agent: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+}
+
+// Utility functions
+export function validateAgentMetadata(metadata: AgentMetadata): boolean {
+  return !!(
+    metadata.name &&
+    metadata.description &&
+    metadata.image &&
+    metadata.attributes &&
+    Array.isArray(metadata.attributes)
+  )
+}
+
+export function createAgentConfig(chainId: number): ERC8004AgentConfig {
+  const configs: Record<number, ERC8004AgentConfig> = {
+    1: { // Ethereum Mainnet
+      registryAddress: process.env.NEXT_PUBLIC_ERC8004_REGISTRY_MAINNET || '',
+      chainId: 1,
+      rpcUrl: process.env.NEXT_PUBLIC_ETHEREUM_RPC_URL || ''
+    },
+    137: { // Polygon Mainnet
+      registryAddress: process.env.NEXT_PUBLIC_ERC8004_REGISTRY_POLYGON || '',
+      chainId: 137,
+      rpcUrl: process.env.NEXT_PUBLIC_POLYGON_RPC_URL || ''
+    },
+    42220: { // Celo Mainnet
+      registryAddress: process.env.NEXT_PUBLIC_ERC8004_REGISTRY_CELO || '',
+      chainId: 42220,
+      rpcUrl: process.env.NEXT_PUBLIC_CELO_RPC_URL || ''
+    },
+    8453: { // Base Mainnet
+      registryAddress: process.env.NEXT_PUBLIC_ERC8004_REGISTRY_BASE || '',
+      chainId: 8453,
+      rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || ''
+    },
+    11155111: { // Sepolia Testnet
+      registryAddress: process.env.NEXT_PUBLIC_ERC8004_REGISTRY_SEPOLIA || '',
+      chainId: 11155111,
+      rpcUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || ''
+    }
+  }
+
+  const config = configs[chainId]
+  if (!config) {
+    throw new Error(`Unsupported chain ID: ${chainId}`)
+  }
+
+  return config
+}
+
+export function formatAgentTokenId(chainId: number, contractAddress: string, tokenId: string): string {
+  return `${chainId}:${contractAddress}:${tokenId}`
+}
+
+export function parseAgentTokenId(tokenId: string): {
+  chainId: number
+  contractAddress: string
+  tokenId: string
+} {
+  const [chainId, contractAddress, tokenIdPart] = tokenId.split(':')
+  
+  if (!chainId || !contractAddress || !tokenIdPart) {
+    throw new Error('Invalid token ID format. Expected: chainId:contractAddress:tokenId')
+  }
+
+  return {
+    chainId: parseInt(chainId),
+    contractAddress,
+    tokenId: tokenIdPart
+  }
+}

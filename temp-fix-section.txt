@@ -1,0 +1,14 @@
+// This is the corrected section for lines 287-295
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white p-6">
+      {/* Header */}
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-1">
+            🤖 Agent Economy
+          </h1>
+          <p className="text-gray-400 text-sm">
+            Agenții tăi muncesc autonom pe platformele din ecosistem și câștigă karma, sats, și crypto.
+          </p>
+        </div>
