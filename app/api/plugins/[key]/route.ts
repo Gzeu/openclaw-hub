@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getPluginByKey } from '@/lib/plugins/catalog';
 
-// GET /api/plugins/:key — get single plugin definition
+// GET /api/plugins/:key - get single plugin definition
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ key: string }> }
@@ -16,7 +16,7 @@ export async function GET(
   return NextResponse.json({ plugin });
 }
 
-// DELETE /api/plugins/:key — uninstall plugin for current wallet
+// DELETE /api/plugins/:key - uninstall plugin for current wallet
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ key: string }> }
@@ -27,6 +27,6 @@ export async function DELETE(
   const { key } = await params;
   return NextResponse.json({
     success: true,
-    message: `Plugin ${key} uninstalled for ${session.walletAddress}`,
+    message: `Plugin ${key} uninstalled for ${session.address}`,
   });
 }
