@@ -1,129 +1,223 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
+
+type LoginStep = 'idle' | 'connecting' | 'waiting_scan' | 'verifying' | 'done' | 'error';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const router = useRouter()
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get('from') ?? '/';
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+  const [step, setStep] = useState<LoginStep>('idle');
+  const [qrUri, setQrUri] = useState<string>('');
+  const [error, setError] = useState<string>('');
+  const [address, setAddress] = useState<string>('');
+
+  const handleConnect = useCallback(async () => {
+    setStep('connecting');
+    setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const { WalletConnectV2Provider } = await import(
+        '@multiversx/sdk-wallet-connect-provider'
+      );
+      const { NativeAuthClient } = await import('@multiversx/sdk-native-auth-client');
+
+      const CHAIN_ID = '1'; // mainnet
+      const RELAY_URL = 'wss://relay.walletconnect.com';
+      const PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID!;
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://openclaw-hub-ashen.vercel.app';
+
+      // Build Native Auth token (block hash from mainnet)
+      const nativeAuthClient = new NativeAuthClient({
+        origin: APP_URL,
+        expirySeconds: 86400,
+      });
+      const token = await nativeAuthClient.initialize();
+
+      const provider = new WalletConnectV2Provider(
+        {
+          onClientLogin: () => {},
+          onClientLogout: () => setStep('idle'),
+          onClientEvent: () => {},
+        },
+        CHAIN_ID,
+        RELAY_URL,
+        PROJECT_ID
+      );
+
+      await provider.init();
+
+      const { uri, approval } = await provider.connect({
+        methods: ['mvx_signNativeAuthToken', 'mvx_cancelAction'],
+        metadata: {
+          name: 'OpenClaw Hub',
+          description: 'AI Agent Ecosystem powered by OpenClaw',
+          url: APP_URL,
+          icons: [`${APP_URL}/logo.png`],
+        },
+      });
+
+      if (uri) {
+        setQrUri(uri);
+        setStep('waiting_scan');
+      }
+
+      // Wait for user to scan QR in xPortal
+      const loginResult = await provider.login({ approval, token });
+      const walletAddress = loginResult.address ?? (await provider.getAddress());
+      const signature = loginResult.signature ?? '';
+
+      setStep('verifying');
+
+      // Build accessToken: base64(address).base64(token).signature
+      const accessToken = [
+        btoa(walletAddress),
+        btoa(token),
+        signature,
+      ].join('.');
+
+      const res = await fetch('/api/auth/mx/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      })
+        body: JSON.stringify({ accessToken }),
+      });
 
-      const data = await response.json()
-
-      if (response.ok) {
-        // Store token in localStorage
-        localStorage.setItem('auth-token', data.token)
-        router.push('/config')
-      } else {
-        setError(data.error || 'Login failed')
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? 'Verification failed');
       }
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const handleQuickLogin = () => {
-    setEmail('test@example.com')
-    setPassword('password123')
-    setTimeout(() => {
-      document.getElementById('login-form')?.dispatchEvent(new Event('submit'))
-    }, 100)
-  }
+      setAddress(walletAddress);
+      setStep('done');
+
+      setTimeout(() => router.push(from), 800);
+    } catch (err: unknown) {
+      console.error('[Login]', err);
+      const msg = err instanceof Error ? err.message : 'Connection failed';
+      setError(msg);
+      setStep('error');
+    }
+  }, [from, router]);
+
+  // Auto-open QR as deeplink on mobile
+  useEffect(() => {
+    if (qrUri && /android|iphone|ipad/i.test(navigator.userAgent)) {
+      window.location.href = qrUri;
+    }
+  }, [qrUri]);
+
+  const qrImageUrl = qrUri
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrUri)}&bgcolor=0a0a0a&color=22d3ee&format=svg`
+    : '';
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="max-w-md w-full p-6">
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Login</h1>
-          <p className="text-gray-400">Sign in to access configuration</p>
+          <div className="text-4xl mb-3">🧠</div>
+          <h1 className="text-2xl font-bold text-white">OpenClaw Hub</h1>
+          <p className="text-zinc-400 text-sm mt-1">AI Agent Ecosystem</p>
         </div>
 
-        <div className="bg-zinc-800 rounded-lg p-6">
-          <form id="login-form" onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-4 py-2 text-white"
-                placeholder="Enter your email"
-                required
-              />
-            </div>
+        {/* Card */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          {/* Idle */}
+          {step === 'idle' && (
+            <>
+              <p className="text-zinc-300 text-center text-sm mb-6">
+                Conectează-te cu portofelul tău MultiversX
+                <br />
+                <span className="text-zinc-500">Mainnet · xPortal</span>
+              </p>
+              <button
+                onClick={handleConnect}
+                className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+              >
+                <span className="text-lg">🔷</span>
+                Connect xPortal
+              </button>
+            </>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-4 py-2 text-white"
-                placeholder="Enter your password"
-                required
-              />
+          {/* Connecting */}
+          {step === 'connecting' && (
+            <div className="text-center py-4">
+              <div className="animate-spin text-3xl mb-3">⌛</div>
+              <p className="text-zinc-300">Se inițializează...</p>
             </div>
+          )}
 
-            {error && (
-              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3">
+          {/* QR */}
+          {step === 'waiting_scan' && qrUri && (
+            <>
+              <p className="text-center text-zinc-300 text-sm mb-4">
+                Scanează cu <strong>xPortal</strong> pe telefon
+              </p>
+              <div className="flex justify-center mb-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrImageUrl}
+                  alt="xPortal QR"
+                  width={280}
+                  height={280}
+                  className="rounded-xl border border-zinc-700"
+                />
+              </div>
+              <p className="text-center text-zinc-500 text-xs">
+                Aşteaptă confirmare din aplicație...
+              </p>
+              <div className="mt-4 flex justify-center">
+                <span className="animate-pulse text-cyan-400 text-sm">⏳ Waiting for xPortal...</span>
+              </div>
+            </>
+          )}
+
+          {/* Verifying */}
+          {step === 'verifying' && (
+            <div className="text-center py-4">
+              <div className="animate-spin text-3xl mb-3">🔄</div>
+              <p className="text-zinc-300">Se verifică semnatura...</p>
+            </div>
+          )}
+
+          {/* Done */}
+          {step === 'done' && (
+            <div className="text-center py-4">
+              <div className="text-4xl mb-3">✅</div>
+              <p className="text-green-400 font-semibold">Conectat!</p>
+              <p className="text-zinc-400 text-xs mt-1 font-mono">
+                {address.slice(0, 8)}...{address.slice(-6)}
+              </p>
+            </div>
+          )}
+
+          {/* Error */}
+          {step === 'error' && (
+            <>
+              <div className="text-center py-2 mb-4">
+                <div className="text-3xl mb-2">⚠️</div>
                 <p className="text-red-400 text-sm">{error}</p>
               </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
-
-          <div className="mt-4 pt-4 border-t border-zinc-700">
-            <button
-              onClick={handleQuickLogin}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-            >
-              ⚡ Quick Login (Demo)
-            </button>
-          </div>
+              <button
+                onClick={() => { setStep('idle'); setError(''); setQrUri(''); }}
+                className="w-full border border-zinc-700 text-zinc-300 hover:bg-zinc-800 py-2 px-4 rounded-xl transition-all text-sm"
+              >
+                Încearcă din nou
+              </button>
+            </>
+          )}
         </div>
 
-        <div className="text-center mt-6">
-          <p className="text-gray-400 text-sm">
-            Demo credentials: test@example.com / password123
-          </p>
-        </div>
-
-        <div className="text-center mt-4">
-          <button
-            onClick={() => router.push('/')}
-            className="text-blue-400 hover:text-blue-300 text-sm"
-          >
-            ← Back to Home
-          </button>
-        </div>
+        {/* Footer */}
+        <p className="text-center text-zinc-600 text-xs mt-6">
+          MultiversX Mainnet · WalletConnect v2 · Native Auth
+        </p>
       </div>
     </div>
-  )
+  );
 }
