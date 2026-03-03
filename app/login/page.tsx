@@ -66,12 +66,6 @@ export default function LoginPage() {
 
       const { uri, approval } = await provider.connect({
         methods: ['mvx_signNativeAuthToken', 'mvx_cancelAction'],
-        metadata: {
-          name: 'OpenClaw Hub',
-          description: 'AI Agent Ecosystem powered by OpenClaw',
-          url: APP_URL,
-          icons: [`${APP_URL}/logo.png`],
-        },
       });
 
       if (uri) {
@@ -85,8 +79,7 @@ export default function LoginPage() {
         token: nativeAuthInitToken,
       });
 
-      const walletAddress =
-        loginResult.address ?? (await provider.getAddress());
+      const walletAddress = loginResult.address ?? (await provider.getAddress());
       const signature =
         (loginResult as any).signature ??
         ((provider as any).getSignature
@@ -115,7 +108,6 @@ export default function LoginPage() {
 
       setAddress(walletAddress);
       setStep('done');
-
       setTimeout(() => router.push(from), 800);
     } catch (err: unknown) {
       console.error('[Login]', err);
@@ -138,81 +130,72 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-md space-y-6">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="text-4xl mb-3">🧠</div>
+        <div className="text-center space-y-2">
+          <div className="text-5xl">🧠</div>
           <h1 className="text-2xl font-bold text-white">OpenClaw Hub</h1>
-          <p className="text-zinc-400 text-sm mt-1">AI Agent Ecosystem</p>
+          <p className="text-zinc-400 text-sm">AI Agent Ecosystem</p>
         </div>
 
         {/* Card */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
           {/* Idle */}
           {step === 'idle' && (
             <>
-              <p className="text-zinc-300 text-center text-sm mb-6">
-                Conectează-te cu portofelul tău MultiversX
-                <br />
-                <span className="text-zinc-500">Mainnet · xPortal</span>
-              </p>
+              <div className="text-center space-y-1">
+                <p className="text-zinc-300 text-sm">Conectează-te cu portofelul tău MultiversX</p>
+                <p className="text-zinc-500 text-xs">Mainnet · xPortal</p>
+              </div>
               <button
                 onClick={handleConnect}
                 className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
               >
-                <span className="text-lg">🔷</span>
-                Connect xPortal
+                <span>🔷</span> Connect xPortal
               </button>
             </>
           )}
 
           {/* Connecting */}
           {step === 'connecting' && (
-            <div className="text-center py-4">
-              <div className="animate-spin text-3xl mb-3">⌛</div>
-              <p className="text-zinc-300">Se inițializează...</p>
+            <div className="text-center space-y-3 py-4">
+              <div className="text-4xl">⌛</div>
+              <p className="text-zinc-300 text-sm">Se inițializează...</p>
             </div>
           )}
 
           {/* QR */}
           {step === 'waiting_scan' && qrUri && (
             <>
-              <p className="text-center text-zinc-300 text-sm mb-4">
+              <p className="text-center text-zinc-300 text-sm">
                 Scanează cu <strong>xPortal</strong> pe telefon
               </p>
-              <div className="flex justify-center mb-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={qrImageUrl}
-                  alt="xPortal QR"
-                  width={280}
-                  height={280}
-                  className="rounded-xl border border-zinc-700"
-                />
-              </div>
-              <p className="text-center text-zinc-500 text-xs">
-                Aşteaptă confirmare din aplicație...
-              </p>
-              <div className="mt-4 flex justify-center">
-                <span className="animate-pulse text-cyan-400 text-sm">⏳ Waiting for xPortal...</span>
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrImageUrl} alt="xPortal QR" className="mx-auto rounded-xl" />
+              <p className="text-center text-zinc-500 text-xs">Aşteaptă confirmare din aplicație...</p>
+              <button
+                disabled
+                className="w-full bg-zinc-800 text-zinc-400 py-2 px-4 rounded-xl text-sm cursor-wait"
+              >
+                ⏳ Waiting for xPortal...
+              </button>
             </>
           )}
 
           {/* Verifying */}
           {step === 'verifying' && (
-            <div className="text-center py-4">
-              <div className="animate-spin text-3xl mb-3">🔄</div>
-              <p className="text-zinc-300">Se verifică semnatura...</p>
+            <div className="text-center space-y-3 py-4">
+              <div className="text-4xl">🔄</div>
+              <p className="text-zinc-300 text-sm">Se verifică semnatura...</p>
             </div>
           )}
 
           {/* Done */}
           {step === 'done' && (
-            <div className="text-center py-4">
-              <div className="text-4xl mb-3">✅</div>
-              <p className="text-green-400 font-semibold">Conectat!</p>
-              <p className="text-zinc-400 text-xs mt-1 font-mono">
+            <div className="text-center space-y-3 py-4">
+              <div className="text-4xl">✅</div>
+              <p className="text-zinc-300 text-sm">Conectat!</p>
+              <p className="text-cyan-400 font-mono text-xs">
                 {address.slice(0, 8)}...{address.slice(-6)}
               </p>
             </div>
@@ -221,8 +204,8 @@ export default function LoginPage() {
           {/* Error */}
           {step === 'error' && (
             <>
-              <div className="text-center py-2 mb-4">
-                <div className="text-3xl mb-2">⚠️</div>
+              <div className="text-center space-y-3 py-4">
+                <div className="text-4xl">⚠️</div>
                 <p className="text-red-400 text-sm">{error}</p>
               </div>
               <button
@@ -236,7 +219,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-zinc-600 text-xs mt-6">
+        <p className="text-center text-zinc-600 text-xs">
           MultiversX Mainnet · WalletConnect v2 · Native Auth
         </p>
       </div>
