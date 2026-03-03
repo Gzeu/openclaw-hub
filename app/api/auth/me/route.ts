@@ -7,8 +7,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return NextResponse.json({
-    address: session.walletAddress,
-    connectedAt: session.connectedAt,
-    expiresAt: session.expiresAt,
+    address: session.address,
+    iat: session.iat,
+    exp: session.exp,
   });
 }
