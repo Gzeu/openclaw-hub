@@ -1,81 +1,55 @@
-/**
- * Next.js Middleware — API Route Protection
- *
- * Protects /api/agents/* routes. Accepts:
- *   - Header x-cron-secret = CRON_SECRET  (internal / cron calls)
- *   - Header x-api-key     = AGENTS_API_KEY (external agent calls)
- *
- * When env vars are not configured, routes are left open in development
- * and return a clear 503 "not configured" response in production —
- * never a crash / white page.
- */
 import { NextRequest, NextResponse } from 'next/server';
+import { getSessionFromRequest } from '@/lib/session';
 
-const PUBLIC_AGENT_PATHS = [
+/** Public routes that never require a wallet session */
+const PUBLIC_PATHS = [
+  '/login',
+  '/api/auth/mx/verify',
+  '/api/auth/logout',
   '/api/agents/status',
   '/api/agents/webhook',
+  '/_next',
+  '/favicon',
+  '/public',
 ];
 
-export default function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export default function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
 
-  // Only gate /api/agents/* routes
-  if (!pathname.startsWith('/api/agents/')) {
+  // Allow public paths
+  if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  // Always allow public endpoints through
-  if (PUBLIC_AGENT_PATHS.some((p) => pathname.startsWith(p))) {
+  // Static assets
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/static/') ||
+    pathname.includes('.')
+  ) {
     return NextResponse.next();
   }
 
-  const cronSecret   = process.env.CRON_SECRET   ?? '';
-  const agentsApiKey = process.env.AGENTS_API_KEY ?? '';
-  const isDev        = process.env.NODE_ENV === 'development';
-
-  // Check for API key authentication first (for external calls)
-  const providedCron   = request.headers.get('x-cron-secret')  ?? '';
-  const providedApiKey = request.headers.get('x-api-key')      ?? '';
-
-  const validCron   = cronSecret   && providedCron   === cronSecret;
-  const validApiKey = agentsApiKey && providedApiKey === agentsApiKey;
-
-  // If valid API key authentication, allow through
-  if (validCron || validApiKey) {
-    return NextResponse.next();
+  // Check wallet session
+  const session = getSessionFromRequest(req);
+  if (!session) {
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('from', pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // In development, allow all requests without authentication
-  if (isDev) {
-    return NextResponse.next();
+  // Agent API protection (requires x-api-key on top of session)
+  if (pathname.startsWith('/api/agents/')) {
+    const agentsApiKey = process.env.AGENTS_API_KEY ?? '';
+    const providedKey = req.headers.get('x-api-key') ?? '';
+    if (agentsApiKey && providedKey !== agentsApiKey && process.env.NODE_ENV !== 'development') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
-  // If neither secret is configured and not in dev:
-  if (!cronSecret && !agentsApiKey) {
-    return NextResponse.json(
-      {
-        error: 'Not configured',
-        message:
-          'Agent API keys are not set. Add CRON_SECRET and/or AGENTS_API_KEY to your environment variables.',
-        docs: 'https://github.com/Gzeu/openclaw-hub#environment-variables',
-      },
-      { status: 503 }
-    );
-  }
-
-  // Fallback: unauthorized
-  return NextResponse.json(
-    {
-      error: 'Unauthorized',
-      message: 'Missing or invalid authentication credentials.',
-      hint: isDev
-        ? 'In dev, set CRON_SECRET or AGENTS_API_KEY in .env.local and pass them via x-cron-secret / x-api-key headers.'
-        : 'Check your API key.',
-    },
-    { status: 401 }
-  );
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/api/agents/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
