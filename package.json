@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@e2b/code-interpreter": "^1.0.0",
-    "@multiversx/sdk-core": "^13.1.0",
+    "@multiversx/sdk-core": "^13.5.0",
     "@multiversx/sdk-dapp": "^4.0.0",
     "@multiversx/sdk-native-auth-client": "^2.0.1",
     "@multiversx/sdk-native-auth-server": "^2.1.0",
@@ -33,7 +33,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.462.0",
     "mongodb": "^6.12.0",
-            "next": "15.2.8",
+    "next": "15.2.8",
     "next-auth": "^5.0.0-beta.25",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
