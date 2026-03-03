@@ -40,3 +40,12 @@ export interface InstalledPlugin {
   installedAt: number;
   config: Record<string, string>;
 }
+
+export interface RegistrySkill {
+  slug: string;
+  name: string;
+  description: string;
+  tags?: string[];
+  repoUrl?: string;
+  version?: string;
+}
