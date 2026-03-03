@@ -8,7 +8,5 @@ export async function GET(req: NextRequest) {
   }
   return NextResponse.json({
     address: session.address,
-    iat: session.iat,
-    exp: session.exp,
   });
 }
