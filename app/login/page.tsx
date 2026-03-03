@@ -74,12 +74,14 @@ export default function LoginPage() {
       }
 
       // Wait for xPortal scan & signature
-      const loginResult = await provider.login({
+      const loginResult = (await provider.login({
         approval,
         token: nativeAuthInitToken,
-      });
+      })) ?? {};
 
-      const walletAddress = loginResult.address ?? (await provider.getAddress());
+      const walletAddress =
+        (loginResult as { address?: string }).address ??
+        (await provider.getAddress());
       const signature =
         (loginResult as any).signature ??
         ((provider as any).getSignature
