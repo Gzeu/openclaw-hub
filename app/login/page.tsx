@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
 
 type LoginStep = 'idle' | 'connecting' | 'waiting_scan' | 'verifying' | 'done' | 'error';
 
@@ -28,15 +27,29 @@ export default function LoginPage() {
 
       const CHAIN_ID = '1'; // mainnet
       const RELAY_URL = 'wss://relay.walletconnect.com';
-      const PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID!;
-      const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://openclaw-hub-ashen.vercel.app';
 
-      // Build Native Auth token (block hash from mainnet)
+      // Support multiple env var naming conventions
+      const PROJECT_ID =
+        process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID ||
+        process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ||
+        process.env.NEXT_PUBLIC_WC_PROJECT_ID;
+
+      if (!PROJECT_ID) {
+        throw new Error(
+          'WalletConnect Project ID missing. Set NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID in Vercel env vars.'
+        );
+      }
+
+      const APP_URL =
+        process.env.NEXT_PUBLIC_APP_URL ??
+        'https://openclaw-hub-ashen.vercel.app';
+
+      // Build NativeAuth init token (fetches latest block hash from mainnet)
       const nativeAuthClient = new NativeAuthClient({
         origin: APP_URL,
         expirySeconds: 86400,
       });
-      const token = await nativeAuthClient.initialize();
+      const nativeAuthInitToken = await nativeAuthClient.initialize();
 
       const provider = new WalletConnectV2Provider(
         {
@@ -66,19 +79,28 @@ export default function LoginPage() {
         setStep('waiting_scan');
       }
 
-      // Wait for user to scan QR in xPortal
-      const loginResult = await provider.login({ approval, token });
-      const walletAddress = loginResult.address ?? (await provider.getAddress());
-      const signature = loginResult.signature ?? '';
+      // Wait for xPortal scan & signature
+      const loginResult = await provider.login({
+        approval,
+        token: nativeAuthInitToken,
+      });
+
+      const walletAddress =
+        loginResult.address ?? (await provider.getAddress());
+      const signature =
+        (loginResult as any).signature ??
+        ((provider as any).getSignature
+          ? await (provider as any).getSignature()
+          : '');
 
       setStep('verifying');
 
-      // Build accessToken: base64(address).base64(token).signature
-      const accessToken = [
-        btoa(walletAddress),
-        btoa(token),
-        signature,
-      ].join('.');
+      // Build accessToken using SDK helper (correct format for NativeAuth server)
+      const accessToken = nativeAuthClient.getToken(
+        walletAddress,
+        nativeAuthInitToken,
+        signature
+      );
 
       const res = await fetch('/api/auth/mx/verify', {
         method: 'POST',
