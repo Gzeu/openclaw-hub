@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useGetIsLoggedIn, useGetLoginInfo } from '@multiversx/sdk-dapp/hooks'
 import AuthGuard from '@/components/AuthGuard'
 import UserProfile from '@/components/UserProfile'
 import WorkOSAuth from '@/components/WorkOSAuth'
+import MvxConnectButton from '@/components/MvxConnectButton'
 import { api } from '@/lib/api-client'
 import AgentCommunicationsPanelFull from '@/components/AgentCommunicationsPanelFull'
 import CreateAgentForm from '@/components/CreateAgentForm'
@@ -315,6 +317,16 @@ function SandboxPanel({
 
 // Main Page
 export default function AgentsPage() {
+  // MVX NativeAuth
+  const isLoggedIn = useGetIsLoggedIn()
+  const { tokenLogin } = useGetLoginInfo()
+  const nativeAuthToken = tokenLogin?.nativeAuthToken
+
+  // Helper: NativeAuth token takes priority, fallback to legacy JWT
+  const getBearer = () =>
+    nativeAuthToken ||
+    (typeof window !== 'undefined' ? localStorage.getItem('auth-token') : null)
+
   const [agents, setAgents] = useState<Agent[]>([])
   const [agentsLoading, setAgentsLoading] = useState(true)
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
@@ -342,8 +354,6 @@ export default function AgentsPage() {
   const [sandboxLoading, setSandboxLoading] = useState(false)
 
   type RightTab = 'sandbox' | 'delegate' | 'ai-chat' | 'communications' | 'agent-chat'
-
-  // Active tab on right panel
   const [rightTab, setRightTab] = useState<RightTab>('ai-chat')
 
   // Delegate
@@ -363,18 +373,12 @@ export default function AgentsPage() {
     return () => clearInterval(iv)
   }, [])
 
-  // Handle agent creation success
   const handleAgentCreated = (agentId: string, sessionKey: string) => {
     setShowCreateAgent(false)
     setToast({ message: 'Agent created successfully!', type: 'success' })
-    
-    // Refresh agents list
-    setTimeout(() => {
-      loadAgents() // Refresh agents without full page reload
-    }, 1000)
+    setTimeout(() => { loadAgents() }, 1000)
   }
 
-  // Load agents function
   const loadAgents = async () => {
     setAgentsLoading(true)
     try {
@@ -391,7 +395,6 @@ export default function AgentsPage() {
     }
   }
 
-  // Show toast
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 3000)
@@ -399,31 +402,31 @@ export default function AgentsPage() {
     }
   }, [toast])
 
-  // Agent chat handler
+  // Agent chat handler — uses NativeAuth bearer
   const send = async () => {
     if (!selectedAgent || !input.trim()) return
     const userMsg = { role: 'user' as const, text: input, ts: new Date().toISOString() }
     setMessages((m) => [...m, userMsg])
     setChatLoading(true)
+    const bearer = getBearer()
     try {
-      const token = localStorage.getItem('auth-token')
       const res = await fetch('/api/agents/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
         },
         body: JSON.stringify({
           sessionKey: selectedAgent.key,
-          text: input
+          text: input,
         }),
       })
-      
+
       if (!res.ok) {
         const errorData = await res.json()
         throw new Error(errorData.error || 'Failed to send message')
       }
-      
+
       const reader = res.body?.getReader()
       if (!reader) throw new Error('No stream')
       let full = ''
@@ -431,70 +434,65 @@ export default function AgentsPage() {
         const { done, value } = await reader.read()
         if (done) break
         const chunk = new TextDecoder().decode(value)
-        // Parse SSE data
         const lines = chunk.split('\n')
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6))
-              if (data.response) {
-                full += data.response
-              }
-            } catch (e) {
-              // Ignore parsing errors
-            }
+              if (data.response) { full += data.response }
+            } catch (e) { /* ignore */ }
           }
         }
       }
-      const agentMsg: ChatMsg = {
+      setMessages((m) => [...m, {
         role: 'agent',
         text: full || '(no response)',
         ts: new Date().toISOString(),
-      }
-      setMessages((m) => [...m, agentMsg])
+      }])
     } catch (e: any) {
-      setMessages((m) => [
-        ...m,
-        { role: 'agent', text: `Error: ${e.message}`, ts: new Date().toISOString() },
-      ])
+      setMessages((m) => [...m, {
+        role: 'agent',
+        text: `Error: ${e.message}`,
+        ts: new Date().toISOString(),
+      }])
     } finally {
       setChatLoading(false)
     }
     setInput('')
   }
 
-  // AI chat handler
+  // AI chat handler — uses NativeAuth bearer
   const sendAiChat = async () => {
     if (!aiInput.trim()) return
     const userMsg = { role: 'user' as const, text: aiInput, ts: new Date().toISOString() }
     setAiMessages((m) => [...m, userMsg])
     setAiLoading(true)
+    const bearer = getBearer()
     try {
-      const token = localStorage.getItem('auth-token')
       const res = await fetch('/api/chat/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
         },
         body: JSON.stringify({
           message: aiInput,
           model: selectedModel.id,
-          provider: selectedModel.provider
+          provider: selectedModel.provider,
         }),
       })
       const data = await res.json()
-      const aiMsg: ChatMsg = {
+      setAiMessages((m) => [...m, {
         role: 'agent',
         text: data.response || 'Sorry, I could not generate a response.',
         ts: new Date().toISOString(),
-      }
-      setAiMessages((m) => [...m, aiMsg])
+      }])
     } catch (e: any) {
-      setAiMessages((m) => [
-        ...m,
-        { role: 'agent', text: `Error: ${e.message}`, ts: new Date().toISOString() },
-      ])
+      setAiMessages((m) => [...m, {
+        role: 'agent',
+        text: `Error: ${e.message}`,
+        ts: new Date().toISOString(),
+      }])
     } finally {
       setAiLoading(false)
     }
@@ -537,8 +535,7 @@ export default function AgentsPage() {
 
   // Delegate
   const runDelegate = async () => {
-    if (!delegateTask.trim() || !selectedAgent || !delegateTarget || delegateLoading)
-      return
+    if (!delegateTask.trim() || !selectedAgent || !delegateTarget || delegateLoading) return
     setDelegateLoading(true)
     setDelegateResult(null)
     try {
@@ -565,6 +562,20 @@ export default function AgentsPage() {
   // Render
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
+
+      {/* ✅ WALLET OVERLAY — shows when MVX wallet not connected */}
+      {!isLoggedIn && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-6">
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h2 className="text-2xl font-bold mb-2 text-white">Wallet Required</h2>
+            <p className="text-zinc-400 mb-8 text-sm leading-relaxed">
+              Connect your MultiversX wallet to discover agents and delegate tasks.
+            </p>
+            <MvxConnectButton />
+          </div>
+        </div>
+      )}
+
       {/* Topbar */}
       <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="max-w-[1600px] mx-auto px-6 h-14 flex items-center gap-4">
@@ -599,8 +610,10 @@ export default function AgentsPage() {
         </div>
       </header>
 
-      {/* Main 3-panel layout */}
-      <div className="flex-1 flex max-w-[1600px] mx-auto w-full">
+      {/* Main 3-panel layout — dimmed when wallet not connected */}
+      <div className={`flex-1 flex max-w-[1600px] mx-auto w-full ${
+        !isLoggedIn ? 'pointer-events-none select-none opacity-30' : ''
+      }`}>
         {/* Panel 1 — Agent list */}
         <aside className="w-72 shrink-0 border-r border-zinc-800/80 flex flex-col">
           <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
@@ -617,21 +630,14 @@ export default function AgentsPage() {
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {agentsLoading
               ? Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-20 rounded-xl bg-zinc-900 animate-pulse"
-                  />
+                  <div key={i} className="h-20 rounded-xl bg-zinc-900 animate-pulse" />
                 ))
               : agents.length === 0
               ? (
                 <div className="text-center py-12">
                   <p className="text-4xl mb-2">🔌</p>
-                  <p className="text-sm text-zinc-500">
-                    No agents online
-                  </p>
-                  <p className="text-xs text-zinc-600 mt-1">
-                    Start OpenClaw gateway
-                  </p>
+                  <p className="text-sm text-zinc-500">No agents online</p>
+                  <p className="text-xs text-zinc-600 mt-1">Start OpenClaw gateway</p>
                 </div>
               )
               : agents.map((a) => (
@@ -743,9 +749,7 @@ export default function AgentsPage() {
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) =>
-                    e.key === 'Enter' && !e.shiftKey && send()
-                  }
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()}
                   placeholder={
                     selectedAgent
                       ? `Message ${selectedAgent.label ?? selectedAgent.key}...`
@@ -779,7 +783,6 @@ export default function AgentsPage() {
                   </div>
                 </div>
 
-                {/* Model Selector Modal */}
                 {showModelSelector && (
                   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -831,9 +834,7 @@ export default function AgentsPage() {
                   <input
                     value={aiInput}
                     onChange={(e) => setAiInput(e.target.value)}
-                    onKeyDown={(e) =>
-                      e.key === 'Enter' && !e.shiftKey && sendAiChat()
-                    }
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendAiChat()}
                     placeholder={`Message ${selectedModel.name}...`}
                     disabled={aiLoading}
                     className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors disabled:opacity-40"
@@ -851,9 +852,8 @@ export default function AgentsPage() {
           </div>
         </section>
 
-        {/* Panel 3 — Sandbox + Delegate */}
+        {/* Panel 3 — Sandbox + Delegate + Communications */}
         <aside className="w-[420px] shrink-0 flex flex-col">
-          {/* Tabs */}
           <div className="flex border-b border-zinc-800">
             {(['sandbox', 'delegate', 'communications'] as const).map((tab) => (
               <button
@@ -872,7 +872,6 @@ export default function AgentsPage() {
 
           {rightTab === 'sandbox' ? (
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Code editor area */}
               <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-800">
                 <select
                   value={lang}
@@ -897,7 +896,6 @@ export default function AgentsPage() {
                 spellCheck={false}
                 style={{ minHeight: '180px', maxHeight: '220px' }}
               />
-              {/* Output */}
               <div className="flex-1 overflow-hidden">
                 <SandboxPanel result={sandboxResult} loading={sandboxLoading} />
               </div>
@@ -905,17 +903,13 @@ export default function AgentsPage() {
           ) : rightTab === 'delegate' ? (
             <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">
-                  From Agent
-                </label>
+                <label className="text-xs text-zinc-400 mb-1.5 block">From Agent</label>
                 <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300">
                   {selectedAgent?.key ?? 'Select agent first'}
                 </div>
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1.5 block">
-                  To Agent (session key)
-                </label>
+                <label className="text-xs text-zinc-400 mb-1.5 block">To Agent (session key)</label>
                 <select
                   value={delegateTarget}
                   onChange={(e) => setDelegateTarget(e.target.value)}
@@ -990,13 +984,11 @@ export default function AgentsPage() {
       {/* Toast Notification */}
       {toast && (
         <div className={`fixed bottom-4 right-4 px-4 py-2 rounded-lg text-sm ${
-          toast.type === 'success' 
-            ? 'bg-emerald-600 text-white' 
-            : 'bg-red-600 text-white'
+          toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
         }`}>
           {toast.message}
         </div>
       )}
-      </div>
+    </div>
   )
 }
