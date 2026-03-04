@@ -29,6 +29,8 @@ const PROTECTED_PAGES = [
   '/activity',
   '/analyst',
   '/chat',
+  '/profile',
+  '/plugins',
 ];
 
 export default function middleware(req: NextRequest) {
@@ -57,7 +59,8 @@ export default function middleware(req: NextRequest) {
     const session = getSessionFromRequest(req);
     if (!session) {
       const loginUrl = new URL('/login', req.url);
-      loginUrl.searchParams.set('redirect', pathname);
+      // Use 'from' param — consistent with login/page.tsx searchParams.get('from')
+      loginUrl.searchParams.set('from', pathname);
       return NextResponse.redirect(loginUrl);
     }
     return NextResponse.next();
