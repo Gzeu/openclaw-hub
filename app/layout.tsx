@@ -40,17 +40,19 @@ export const metadata: Metadata = {
 };
 
 const NAV_LINKS = [
-  { href: '/chat',        label: 'Chat',     icon: '💬' },
-  { href: '/agents',      label: 'Agents',   icon: '🤖' },
-  { href: '/economy',     label: 'Economy',  icon: '💸' },
-  { href: '/marketplace', label: 'Market',   icon: '🛍️' },
-  { href: '/wallet',      label: 'Wallet',   icon: '💎' },
-  { href: '/activity',    label: 'Activity', icon: '📡' },
-  { href: '/analyst',     label: 'Analyst',  icon: '🧠' },
-  { href: '/skills',      label: 'Skills',   icon: '⚡' },
-  { href: '/tools',       label: 'Tools',    icon: '🛠️' },
-  { href: '/settings',    label: 'Settings', icon: '⚙️' },
-  { href: '/qa',          label: 'FAQ',      icon: '❓' },
+  { href: '/chat', label: 'Chat', icon: '💬' },
+  { href: '/agents', label: 'Agents', icon: '🤖' },
+  { href: '/economy', label: 'Economy', icon: '💸' },
+  { href: '/marketplace', label: 'Market', icon: '🛍️' },
+  { href: '/wallet', label: 'Wallet', icon: '💎' },
+  { href: '/activity', label: 'Activity', icon: '📡' },
+  { href: '/analyst', label: 'Analyst', icon: '🧠' },
+  { href: '/skills', label: 'Skills', icon: '⚡' },
+  { href: '/plugins', label: 'Plugins', icon: '🧩' },
+  { href: '/tools', label: 'Tools', icon: '🛠️' },
+  { href: '/settings', label: 'Settings', icon: '⚙️' },
+  { href: '/profile', label: 'Profile', icon: '👤' },
+  { href: '/qa', label: 'FAQ', icon: '❓' },
 ];
 
 export default function RootLayout({
@@ -79,7 +81,6 @@ export default function RootLayout({
                   OpenClaw<span className="text-gradient ml-1">Hub</span>
                 </span>
               </Link>
-
               <nav className="flex items-center gap-0.5 flex-1 overflow-x-auto no-scrollbar">
                 {NAV_LINKS.map(({ href, label, icon }) => (
                   <Link
@@ -93,7 +94,6 @@ export default function RootLayout({
                   </Link>
                 ))}
               </nav>
-
               <div className="flex items-center gap-2 ml-2 shrink-0">
                 <a
                   href="/skill.md"
@@ -104,6 +104,12 @@ export default function RootLayout({
                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--green)' }} />
                   skill.md
                 </a>
+                <Link
+                  href="/profile"
+                  className="btn btn-ghost py-1.5 px-3 text-xs"
+                >
+                  👤 <span className="hidden sm:inline ml-1">Profile</span>
+                </Link>
                 <a
                   href="https://github.com/Gzeu/openclaw-hub"
                   target="_blank"
@@ -118,7 +124,6 @@ export default function RootLayout({
               </div>
             </div>
           </header>
-
           <main style={{ minHeight: 'calc(100vh - 56px)' }}>
             <WorkOSAuthProvider>
               <ConvexClientProvider>
@@ -126,7 +131,6 @@ export default function RootLayout({
               </ConvexClientProvider>
             </WorkOSAuthProvider>
           </main>
-
           <footer style={{ borderTop: '1px solid var(--border)' }} className="py-6 mt-16">
             <div className="max-w-[1440px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -138,6 +142,9 @@ export default function RootLayout({
                 <span>MIT</span>
               </div>
               <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--text-dim)' }}>
+                <Link href="/profile" className="hover:text-white transition-colors">👤 Profile</Link>
+                <Link href="/plugins" className="hover:text-white transition-colors">🧩 Plugins</Link>
+                <Link href="/settings" className="hover:text-white transition-colors">⚙️ Settings</Link>
                 <Link href="/qa" className="hover:text-white transition-colors">FAQ</Link>
                 <a href="/skill.md" className="hover:text-white transition-colors">skill.md</a>
                 <a href="/api/skills" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">API</a>
