@@ -1,204 +1,151 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
+import { useState } from 'react';
+import Link from 'next/link';
+
+const API_KEYS_CONFIG = [
+  { id: 'OPENROUTER_API_KEY', label: 'OpenRouter', icon: '🤖', placeholder: 'sk-or-...', docs: 'https://openrouter.ai/keys' },
+  { id: 'MISTRAL_API_KEY', label: 'Mistral AI', icon: '🌬️', placeholder: 'mistral-...', docs: 'https://console.mistral.ai' },
+  { id: 'GROQ_API_KEY', label: 'Groq', icon: '⚡', placeholder: 'gsk_...', docs: 'https://console.groq.com' },
+  { id: 'TAVILY_API_KEY', label: 'Tavily Search', icon: '🔍', placeholder: 'tvly-...', docs: 'https://tavily.com' },
+  { id: 'E2B_API_KEY', label: 'E2B Code', icon: '💻', placeholder: 'e2b_...', docs: 'https://e2b.dev' },
+  { id: 'NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID', label: 'WalletConnect Project ID', icon: '🔷', placeholder: 'abc123...', docs: 'https://cloud.walletconnect.com' },
+  { id: 'UPSTASH_REDIS_REST_URL', label: 'Upstash Redis URL', icon: '🗣️', placeholder: 'https://...upstash.io', docs: 'https://upstash.com' },
+  { id: 'UPSTASH_REDIS_REST_TOKEN', label: 'Upstash Redis Token', icon: '🗣️', placeholder: 'AX4A...', docs: 'https://upstash.com' },
+];
+
+const MODEL_OPTIONS = [
+  { value: 'mistral-medium-latest', label: 'Mistral Medium (default)' },
+  { value: 'mistral-large-latest', label: 'Mistral Large' },
+  { value: 'openai/gpt-4o', label: 'GPT-4o (via OpenRouter)' },
+  { value: 'google/gemini-pro', label: 'Gemini Pro (via OpenRouter)' },
+  { value: 'meta-llama/llama-3-70b-instruct', label: 'Llama 3 70B (via Groq)' },
+];
+
+type Tab = 'apikeys' | 'model' | 'general';
 
 export default function SettingsPage() {
-  const [gatewayToken, setGatewayToken] = useState('')
-  const [gatewayUrl, setGatewayUrl] = useState('ws://localhost:18789')
-  const [isLoading, setIsLoading] = useState(false)
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info')
+  const [activeTab, setActiveTab] = useState<Tab>('apikeys');
+  const [savedModel, setSavedModel] = useState('mistral-medium-latest');
+  const [savedMsg, setSavedMsg] = useState('');
 
-  useEffect(() => {
-    // Load current settings from environment
-    setGatewayToken(process.env.NEXT_PUBLIC_OPENCLAW_GATEWAY_TOKEN || '')
-    setGatewayUrl(process.env.NEXT_PUBLIC_OPENCLAW_GATEWAY_URL || 'ws://localhost:18789')
-  }, [])
-
-  const handleSave = async () => {
-    setIsLoading(true)
-    setMessage('')
-
-    try {
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          gatewayToken,
-          gatewayUrl,
-        }),
-      })
-
-      if (response.ok) {
-        setMessage('Gateway settings saved successfully!')
-        setMessageType('success')
-        
-        // Update OpenClaw config
-        await updateOpenClawConfig(gatewayToken, gatewayUrl)
-      } else {
-        throw new Error('Failed to save settings')
-      }
-    } catch (error) {
-      setMessage(`Error saving settings: ${error}`)
-      setMessageType('error')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const updateOpenClawConfig = async (token: string, url: string) => {
-    try {
-      // This would need to be implemented server-side
-      // For now, just show success message
-      console.log('Updating OpenClaw config with:', { token, url })
-    } catch (error) {
-      console.error('Failed to update OpenClaw config:', error)
-    }
-  }
-
-  const testConnection = async () => {
-    setIsLoading(true)
-    setMessage('Testing connection...')
-
-    try {
-      const response = await fetch('/api/test-gateway', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          gatewayUrl,
-          gatewayToken,
-        }),
-      })
-
-      const result = await response.json()
-      
-      if (result.success) {
-        setMessage('Connection test successful!')
-        setMessageType('success')
-      } else {
-        setMessage(`Connection test failed: ${result.error}`)
-        setMessageType('error')
-      }
-    } catch (error) {
-      setMessage(`Connection test failed: ${error}`)
-      setMessageType('error')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const handleSaveModel = () => {
+    localStorage.setItem('openclaw_default_model', savedModel);
+    setSavedMsg('Salvat!');
+    setTimeout(() => setSavedMsg(''), 2000);
+  };
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <Badge variant="outline">OpenClaw Gateway</Badge>
+    <div className="max-w-3xl mx-auto px-4 py-12 space-y-8">
+      <div className="flex items-center gap-3">
+        <div className="text-4xl">⚙️</div>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Setări</h1>
+          <p className="text-zinc-400 text-sm">Configurează API keys, modele și preferințe</p>
         </div>
-
-        {message && (
-          <Alert className={messageType === 'error' ? 'border-red-500' : messageType === 'success' ? 'border-green-500' : 'border-blue-500'}>
-            <AlertDescription>{message}</AlertDescription>
-          </Alert>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>OpenClaw Gateway Configuration</CardTitle>
-            <CardDescription>
-              Configure your OpenClaw Gateway connection settings. The Gateway token is used for authentication with your local OpenClaw instance.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="gateway-url">Gateway URL</Label>
-              <Input
-                id="gateway-url"
-                type="text"
-                value={gatewayUrl}
-                onChange={(e) => setGatewayUrl(e.target.value)}
-                placeholder="ws://localhost:18789"
-              />
-              <p className="text-sm text-muted-foreground">
-                WebSocket URL for your OpenClaw Gateway instance
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="gateway-token">Gateway Token</Label>
-              <Input
-                id="gateway-token"
-                type="password"
-                value={gatewayToken}
-                onChange={(e) => setGatewayToken(e.target.value)}
-                placeholder="oc-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              />
-              <p className="text-sm text-muted-foreground">
-                Authentication token for OpenClaw Gateway. Generate with: <code>npx openclaw config set gateway.auth.token "your-token"</code>
-              </p>
-            </div>
-
-            <div className="flex space-x-2">
-              <Button 
-                onClick={handleSave} 
-                disabled={isLoading}
-                className="flex-1"
-              >
-                {isLoading ? 'Saving...' : 'Save Settings'}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={testConnection}
-                disabled={isLoading}
-              >
-                Test Connection
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>How to Get Gateway Token</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg">
-              <h4 className="font-semibold mb-2">Method 1: Generate New Token</h4>
-              <div className="space-y-2">
-                <p>Run this command in your terminal:</p>
-                <code className="block bg-background p-2 rounded text-sm">
-                  npx openclaw config set gateway.auth.token "oc-$(node -e 'console.log(require('crypto').randomBytes(24).toString('hex'))')"
-                </code>
-                <p className="text-sm text-muted-foreground">
-                  This generates a new random token and sets it in your OpenClaw configuration.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-muted p-4 rounded-lg">
-              <h4 className="font-semibold mb-2">Method 2: Use Existing Token</h4>
-              <div className="space-y-2">
-                <p>Check your current token:</p>
-                <code className="block bg-background p-2 rounded text-sm">
-                  npx openclaw config get gateway.auth.token
-                </code>
-                <p className="text-sm text-muted-foreground">
-                  Copy the token and paste it above.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-zinc-800">
+        {(['apikeys', 'model', 'general'] as Tab[]).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-all -mb-px ${
+              activeTab === tab
+                ? 'border-cyan-500 text-white'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            {tab === 'apikeys' && '🔑 API Keys'}
+            {tab === 'model' && '🤖 Model'}
+            {tab === 'general' && '🛠️ General'}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'apikeys' && (
+        <div className="space-y-4">
+          <p className="text-zinc-500 text-sm">
+            API key-urile sunt stocate <strong className="text-zinc-300">exclusiv în Vercel Environment Variables</strong>.
+            Modifică-le din{' '}
+            <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">Vercel Dashboard</a>
+            {' '}→ Project → Settings → Environment Variables.
+          </p>
+          <div className="space-y-3">
+            {API_KEYS_CONFIG.map(key => (
+              <div key={key.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-4">
+                <span className="text-2xl">{key.icon}</span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-white">{key.label}</span>
+                    <code className="text-xs text-zinc-500">{key.id}</code>
+                  </div>
+                  <div className="font-mono text-xs text-zinc-600 mt-1">{key.placeholder}</div>
+                </div>
+                <a href={key.docs} target="_blank" rel="noreferrer" className="text-xs text-cyan-500 hover:underline shrink-0">Docs ↗</a>
+              </div>
+            ))}
+          </div>
+          <div className="bg-zinc-900 border border-amber-800/50 rounded-xl p-4">
+            <p className="text-amber-400 text-xs">
+              ⚠️ API key-urile nu pot fi vizualizate sau editate din browser din motive de securitate.
+              Setează-le în Vercel → Environment Variables, apoi redeploy.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'model' && (
+        <div className="space-y-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">Model implicit pentru Chat</h2>
+            <select
+              value={savedModel}
+              onChange={e => setSavedModel(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500"
+            >
+              {MODEL_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <button onClick={handleSaveModel} className="btn btn-primary text-sm py-2 px-6">
+              {savedMsg || 'Salvează'}
+            </button>
+            <p className="text-zinc-500 text-xs">Salvat local în browser (localStorage). Aplicat din /chat.</p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'general' && (
+        <div className="space-y-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-3">
+            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-4">Acces rapid</h2>
+            <Link href="/profile" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-800 transition-all">
+              <span>👤</span><div><div className="text-sm text-white">Profil și API Key</div><div className="text-xs text-zinc-500">Adresă wallet, copiază API key</div></div>
+              <span className="ml-auto text-zinc-600">→</span>
+            </Link>
+            <Link href="/plugins" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-800 transition-all">
+              <span>🧩</span><div><div className="text-sm text-white">Plugins</div><div className="text-xs text-zinc-500">Integrări active</div></div>
+              <span className="ml-auto text-zinc-600">→</span>
+            </Link>
+            <Link href="/economy" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-800 transition-all">
+              <span>💸</span><div><div className="text-sm text-white">Economy</div><div className="text-xs text-zinc-500">Budget EGLD</div></div>
+              <span className="ml-auto text-zinc-600">→</span>
+            </Link>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-3">
+            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">Platformă</h2>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-zinc-500">Versiune</span><span className="text-white font-mono">v0.3.0</span></div>
+              <div className="flex justify-between"><span className="text-zinc-500">Network</span><span className="text-cyan-400">MultiversX Mainnet</span></div>
+              <div className="flex justify-between"><span className="text-zinc-500">API</span><a href="/api/skills" target="_blank" className="text-cyan-400 hover:underline">/api/skills</a></div>
+              <div className="flex justify-between"><span className="text-zinc-500">Manifest</span><a href="/skill.md" target="_blank" className="text-cyan-400 hover:underline">/skill.md</a></div>
+              <div className="flex justify-between"><span className="text-zinc-500">GitHub</span><a href="https://github.com/Gzeu/openclaw-hub" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">Gzeu/openclaw-hub</a></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }
