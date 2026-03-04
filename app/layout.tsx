@@ -3,7 +3,6 @@ import { Inter } from 'next/font/google';
 import Link from 'next/link';
 import './globals.css';
 import ConvexClientProvider from '@/components/ConvexProvider';
-import WorkOSAuthProvider from '@/components/WorkOSAuthProvider';
 import MultiversXProvider from '@/components/MultiversXProvider';
 
 const inter = Inter({
@@ -125,11 +124,9 @@ export default function RootLayout({
             </div>
           </header>
           <main style={{ minHeight: 'calc(100vh - 56px)' }}>
-            <WorkOSAuthProvider>
-              <ConvexClientProvider>
-                {children}
-              </ConvexClientProvider>
-            </WorkOSAuthProvider>
+            <ConvexClientProvider>
+              {children}
+            </ConvexClientProvider>
           </main>
           <footer style={{ borderTop: '1px solid var(--border)' }} className="py-6 mt-16">
             <div className="max-w-[1440px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
