@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ConvexHttpClient } from 'convex/browser'
 import { api } from '@/convex/_generated/api'
+import { getSessionFromRequest } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,18 +12,27 @@ const ACCEPTED_ORIGINS = [
 ]
 
 /**
+ * GET /api/auth/mx/session
+ * Returns the current session address from cookie.
+ */
+export async function GET(req: NextRequest) {
+  const session = getSessionFromRequest(req)
+  if (!session) {
+    return NextResponse.json({ error: 'No active session' }, { status: 401 })
+  }
+  return NextResponse.json({ address: session.address })
+}
+
+/**
  * POST /api/auth/mx/session
- * Body: { accessToken: string }  — MultiversX NativeAuth token
+ * Body: { accessToken: string } — MultiversX NativeAuth token
  *
  * Validates token → upserts user in Convex → returns { ok, mxAddress, apiKey }.
- * apiKey is stable per address (stored in Convex mxUsers table).
- * Caller stores apiKey and sends x-api-key header for all M2M requests.
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { accessToken } = body as { accessToken?: string }
-
     if (!accessToken || typeof accessToken !== 'string') {
       return NextResponse.json({ error: 'Missing accessToken' }, { status: 400 })
     }
@@ -34,20 +44,19 @@ export async function POST(req: NextRequest) {
       maxExpirySeconds: 86400,
       acceptedOrigins: ACCEPTED_ORIGINS,
     })
+
     const userInfo = await server.validate(accessToken)
     const mxAddress: string = userInfo.address
-
     if (!mxAddress?.startsWith('erd1')) {
       return NextResponse.json({ error: 'Invalid MultiversX address' }, { status: 401 })
     }
 
     // Generate a candidate apiKey (used only if user is new)
-    const candidateKey = 'ocl_' + crypto.randomUUID().replace(/-/g, '')
+    const candidateKey = 'sk-oc-' + crypto.randomUUID().replace(/-/g, '').slice(0, 16)
 
     // Upsert in Convex — returns canonical apiKey (existing or new)
     const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL
     let apiKey = candidateKey
-
     if (convexUrl) {
       const client = new ConvexHttpClient(convexUrl)
       const result = await client.mutation(api.mxUsers.upsertMxUser, {
@@ -78,7 +87,7 @@ export async function OPTIONS() {
     status: 204,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
     },
   })
