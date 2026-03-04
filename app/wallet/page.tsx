@@ -38,21 +38,11 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Auto-load wallet from session cookie on mount
-  useEffect(() => {
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.address) {
-          setSessionAddress(data.address)
-          lookup(data.address)
-        }
-      })
-      .catch(() => {})
-  }, [])
-
   const lookup = async (addr: string) => {
-    if (!addr.startsWith('erd1')) { setError('Adresa trebuie s\u0103 înceap\u0103 cu erd1'); return }
+    if (!addr || !addr.startsWith('erd1')) {
+      setError('Adresa trebuie să înceapă cu erd1')
+      return
+    }
     setLoading(true)
     setError('')
     setAccount(null)
@@ -62,45 +52,61 @@ export default function WalletPage() {
         fetch(`/api/wallet/balance?address=${addr}`),
         fetch(`/api/wallet/transactions?address=${addr}`),
       ])
-      const accData = await accRes.json()
-      const txData = await txRes.json()
-      if (!accRes.ok) throw new Error(accData.error ?? 'Eroare laâncărcare cont')
-      setAccount(accData.account ?? null)
-      setTxs(txData.transactions ?? [])
-    } catch (e: any) {
-      setError(e.message)
+      const accData = await accRes.json().catch(() => ({}))
+      const txData = await txRes.json().catch(() => ({}))
+      if (!accRes.ok) throw new Error(accData?.error ?? 'Eroare la încărcare cont')
+      setAccount(accData?.account ?? null)
+      setTxs(txData?.transactions ?? [])
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Eroare necunoscută')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
+
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (data?.address) {
+          setSessionAddress(data.address)
+          lookup(data.address)
+        }
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
-      {/* Page header */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">&#x1F4CE; MultiversX Wallet</h1>
+          <h1 className="text-2xl font-bold text-white">🔗 MultiversX Wallet</h1>
           <p className="text-zinc-400 text-sm mt-1">
-            {sessionAddress
-              ? 'Portofel conectat · Mainnet'
-              : 'Caută orice adresă erd1 pe Mainnet'}
+            {sessionAddress ? 'Portofel conectat · Mainnet' : 'Caută orice adresă erd1 pe Mainnet'}
           </p>
         </div>
         {sessionAddress && (
-          <Link href="/profile" className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 hover:text-white transition-colors">
-            &#x1F464; Profil
+          <Link
+            href="/profile"
+            className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 hover:text-white transition-colors"
+          >
+            👤 Profil
           </Link>
         )}
       </div>
 
-      {/* Session address badge */}
+      {/* Session badge */}
       {sessionAddress && (
         <div className="flex items-center gap-3 bg-cyan-500/5 border border-cyan-500/20 rounded-2xl px-5 py-4">
           <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-          <span className="font-mono text-sm text-cyan-400 break-all">{sessionAddress}</span>
+          <span className="font-mono text-sm text-cyan-400 break-all flex-1">{sessionAddress}</span>
           <a
             href={`https://explorer.multiversx.com/accounts/${sessionAddress}`}
-            target="_blank" rel="noopener noreferrer"
-            className="ml-auto text-xs text-zinc-400 hover:text-white whitespace-nowrap transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-zinc-400 hover:text-white whitespace-nowrap transition-colors"
           >
             Explorer ↗
           </a>
@@ -132,26 +138,30 @@ export default function WalletPage() {
       {/* Loading skeleton */}
       {loading && (
         <div className="grid grid-cols-3 gap-4">
-          {[0,1,2].map(i => (
+          {[0, 1, 2].map(i => (
             <div key={i} className="h-24 bg-zinc-900/50 border border-zinc-800 rounded-2xl animate-pulse" />
           ))}
         </div>
       )}
 
-      {/* Account card */}
+      {/* Account data */}
       {account && !loading && (
         <>
           <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: 'Balance', value: `${account.balanceEgld} EGLD`, icon: '&#x1F4B0;' },
-              { label: 'Nonce', value: account.nonce, icon: '#' },
-              { label: 'Tranzacții', value: account.txCount.toLocaleString('ro-RO'), icon: '&#x1F4E4;' },
-            ].map(s => (
-              <div key={s.label} className="bg-zinc-900/50 border border-zinc-800 rounded-2xl px-5 py-4">
-                <p className="text-xs text-zinc-500 mb-1" dangerouslySetInnerHTML={{__html: s.icon + ' ' + s.label}} />
-                <p className="text-xl font-bold text-white">{s.value}</p>
-              </div>
-            ))}
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl px-5 py-4">
+              <p className="text-xs text-zinc-500 mb-1">💰 Balance</p>
+              <p className="text-xl font-bold text-white">{account.balanceEgld ?? '—'} EGLD</p>
+            </div>
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl px-5 py-4">
+              <p className="text-xs text-zinc-500 mb-1"># Nonce</p>
+              <p className="text-xl font-bold text-white">{account.nonce ?? 0}</p>
+            </div>
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl px-5 py-4">
+              <p className="text-xs text-zinc-500 mb-1">📤 Tranzacții</p>
+              <p className="text-xl font-bold text-white">
+                {typeof account.txCount === 'number' ? account.txCount.toLocaleString() : '—'}
+              </p>
+            </div>
           </div>
 
           {account.username && (
@@ -160,7 +170,7 @@ export default function WalletPage() {
             </div>
           )}
 
-          {/* Transactions */}
+          {/* Transactions list */}
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
               <p className="text-sm font-semibold text-white">Tranzacții recente</p>
@@ -174,12 +184,15 @@ export default function WalletPage() {
                   <a
                     key={tx.txHash}
                     href={tx.explorerUrl}
-                    target="_blank" rel="noopener noreferrer"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-800/30 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-zinc-400">{tx.txHash.slice(0, 12)}...</span>
+                        <span className="font-mono text-xs text-zinc-400">
+                          {(tx.txHash ?? '').slice(0, 12)}...
+                        </span>
                         {tx.function && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-violet-500/20 text-violet-300 rounded border border-violet-500/30">
                             {tx.function}
@@ -187,12 +200,14 @@ export default function WalletPage() {
                         )}
                       </div>
                       <p className="text-xs text-zinc-500 mt-0.5">
-                        {truncateAddress(tx.sender)} → {truncateAddress(tx.receiver)}
+                        {truncateAddress(tx.sender ?? '')} → {truncateAddress(tx.receiver ?? '')}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-semibold text-white">{tx.valueEgld} EGLD</p>
-                      <p className={`text-xs mt-0.5 ${STATUS_COLOR[tx.status] ?? 'text-zinc-400'}`}>{tx.status}</p>
+                      <p className={`text-xs mt-0.5 ${STATUS_COLOR[tx.status] ?? 'text-zinc-400'}`}>
+                        {tx.status}
+                      </p>
                     </div>
                   </a>
                 ))}
@@ -202,12 +217,15 @@ export default function WalletPage() {
         </>
       )}
 
-      {/* No session & no lookup */}
+      {/* Not logged in & no lookup */}
       {!sessionAddress && !account && !loading && (
-        <div className="text-center py-16 border border-dashed border-zinc-800 rounded-2xl">
-          <p className="text-4xl mb-4">🔗</p>
-          <p className="text-zinc-400 text-sm">Conectează-te cu xPortal sau introduce manual o adresă erd1.</p>
-          <Link href="/login" className="inline-block mt-4 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl transition-colors">
+        <div className="text-center py-16 border border-dashed border-zinc-800 rounded-2xl space-y-4">
+          <p className="text-4xl">🔗</p>
+          <p className="text-zinc-400 text-sm">Conectează-te cu xPortal sau introdu manual o adresă erd1.</p>
+          <Link
+            href="/login"
+            className="inline-block px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
             Conectează-te
           </Link>
         </div>

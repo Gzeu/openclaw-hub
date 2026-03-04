@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 
 type LoginStep = 'idle' | 'connecting' | 'waiting_scan' | 'verifying' | 'done' | 'error';
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  // Support both ?from= (middleware) and ?redirect= (legacy)
   const from = searchParams.get('from') ?? searchParams.get('redirect') ?? '/';
 
   const [step, setStep] = useState<LoginStep>('idle');
@@ -26,10 +24,9 @@ export default function LoginPage() {
       );
       const { NativeAuthClient } = await import('@multiversx/sdk-native-auth-client');
 
-      const CHAIN_ID = '1'; // mainnet
+      const CHAIN_ID = '1';
       const RELAY_URL = 'wss://relay.walletconnect.com';
 
-      // Support multiple env var naming conventions
       const PROJECT_ID =
         process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID ||
         process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ||
@@ -45,7 +42,6 @@ export default function LoginPage() {
         process.env.NEXT_PUBLIC_APP_URL ??
         'https://openclaw-hub-ashen.vercel.app';
 
-      // Build NativeAuth init token (fetches latest block hash from mainnet)
       const nativeAuthClient = new NativeAuthClient({
         origin: APP_URL,
         expirySeconds: 86400,
@@ -73,7 +69,6 @@ export default function LoginPage() {
         setStep('waiting_scan');
       }
 
-      // Wait for xPortal scan & signature
       const loginResult = (await provider.login({
         approval,
         token: nativeAuthInitToken,
@@ -91,7 +86,6 @@ export default function LoginPage() {
 
       setStep('verifying');
 
-      // Build accessToken using SDK helper (correct format for NativeAuth server)
       const accessToken = nativeAuthClient.getToken(
         walletAddress,
         nativeAuthInitToken,
@@ -112,17 +106,18 @@ export default function LoginPage() {
       setAddress(walletAddress);
       setStep('done');
 
-      // Redirect after successful login — 'from' is set by middleware
-      setTimeout(() => router.push(from), 800);
+      // Full page reload so Navbar re-reads the session cookie
+      setTimeout(() => {
+        window.location.href = from;
+      }, 800);
     } catch (err: unknown) {
       console.error('[Login]', err);
       const msg = err instanceof Error ? err.message : 'Connection failed';
       setError(msg);
       setStep('error');
     }
-  }, [from, router]);
+  }, [from]);
 
-  // Auto-open QR as deeplink on mobile
   useEffect(() => {
     if (qrUri && /android|iphone|ipad/i.test(navigator.userAgent)) {
       window.location.href = qrUri;
@@ -136,16 +131,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
-        {/* Logo */}
         <div className="text-center space-y-2">
           <div className="text-5xl">🧠</div>
           <h1 className="text-2xl font-bold text-white">OpenClaw Hub</h1>
           <p className="text-zinc-400 text-sm">AI Agent Ecosystem</p>
         </div>
 
-        {/* Card */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
-          {/* Idle */}
           {step === 'idle' && (
             <>
               <div className="text-center space-y-1">
@@ -161,7 +153,6 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* Connecting */}
           {step === 'connecting' && (
             <div className="text-center space-y-3 py-4">
               <div className="text-4xl">⌛</div>
@@ -169,7 +160,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* QR */}
           {step === 'waiting_scan' && qrUri && (
             <>
               <p className="text-center text-zinc-300 text-sm">
@@ -177,7 +167,7 @@ export default function LoginPage() {
               </p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrImageUrl} alt="xPortal QR" className="mx-auto rounded-xl" />
-              <p className="text-center text-zinc-500 text-xs">Aşteaptă confirmare din aplicație...</p>
+              <p className="text-center text-zinc-500 text-xs">Așteaptă confirmare din aplicație...</p>
               <button
                 disabled
                 className="w-full bg-zinc-800 text-zinc-400 py-2 px-4 rounded-xl text-sm cursor-wait"
@@ -187,15 +177,13 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* Verifying */}
           {step === 'verifying' && (
             <div className="text-center space-y-3 py-4">
               <div className="text-4xl">🔄</div>
-              <p className="text-zinc-300 text-sm">Se verifică semnatura...</p>
+              <p className="text-zinc-300 text-sm">Se verifică semnătura...</p>
             </div>
           )}
 
-          {/* Done */}
           {step === 'done' && (
             <div className="text-center space-y-3 py-4">
               <div className="text-4xl">✅</div>
@@ -206,7 +194,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Error */}
           {step === 'error' && (
             <>
               <div className="text-center space-y-3 py-4">
@@ -223,7 +210,6 @@ export default function LoginPage() {
           )}
         </div>
 
-        {/* Footer */}
         <p className="text-center text-zinc-600 text-xs">
           MultiversX Mainnet · WalletConnect v2 · Native Auth
         </p>
