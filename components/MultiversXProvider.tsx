@@ -1,31 +1,22 @@
-'use client';
-
-import { DappProvider } from '@multiversx/sdk-dapp/wrappers/DappProvider';
-import { SignTransactionsModals } from '@multiversx/sdk-dapp/UI/SignTransactionsModals';
-import { TransactionsToastList } from '@multiversx/sdk-dapp/UI/TransactionsToastList';
-import { NotificationModal } from '@multiversx/sdk-dapp/UI/NotificationModal';
-
-const ENVIRONMENT = (process.env.NEXT_PUBLIC_MULTIVERSX_NETWORK || 'mainnet') as 'mainnet' | 'testnet' | 'devnet';
-const WALLET_CONNECT_PROJECT_ID = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || '9b1a9564f91cb659ffe21b73d5c4e2d8';
-
+/**
+ * MultiversXProvider — lightweight wrapper
+ *
+ * @multiversx/sdk-dapp v4 pulls in sdk-hw-provider which requires
+ * sdk-core v14 sub-paths that don't exist in v13. Using DappProvider
+ * at the layout level breaks Next.js SSR build.
+ *
+ * Authentication (WalletConnect v2 + NativeAuth) is handled entirely
+ * inside app/login/page.tsx via lazy dynamic imports — no global
+ * DappProvider is needed.
+ *
+ * This wrapper is intentionally a passthrough so layout.tsx keeps
+ * its import without changes. Re-introduce DappProvider here only
+ * after upgrading sdk-core to ^14 AND sdk-dapp to a compatible version.
+ */
 export default function MultiversXProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <DappProvider
-      environment={ENVIRONMENT}
-      customNetworkConfig={{
-        name: 'customConfig',
-        apiTimeout: 6000,
-        walletConnectV2ProjectId: WALLET_CONNECT_PROJECT_ID,
-      }}
-    >
-      <TransactionsToastList />
-      <NotificationModal />
-      <SignTransactionsModals className="custom-class-for-modals" />
-      {children}
-    </DappProvider>
-  );
+  return <>{children}</>;
 }
