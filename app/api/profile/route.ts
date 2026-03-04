@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
 
-// In-memory store — TODO: migrate to Convex userSettings table
+// In-memory store - TODO: migrate to Convex userSettings table
 const profileStore = new Map<string, Record<string, unknown>>();
 
 async function requireAddress(req: NextRequest): Promise<string | null> {
@@ -20,8 +20,13 @@ export async function GET(req: NextRequest) {
   if (!address) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const stored = profileStore.get(address) ?? {};
+  
   return NextResponse.json({
-    walletAddress: address,
+    mxAddress: address, // Matches ProfileData interface in app/profile/page.tsx
+    username: address.slice(0, 8),
+    budget: 0,
+    apiKey: 'sk-oc-' + address.slice(-12), // Placeholder or fetch from Convex
+    createdAt: Date.now(),
     theme: 'dark',
     language: 'en',
     defaultAgent: 'main',
@@ -32,15 +37,19 @@ export async function GET(req: NextRequest) {
 
 /**
  * PATCH /api/profile
- * Merges partial updates into the user's profile.
+ * Updates the current user's profile settings.
  */
 export async function PATCH(req: NextRequest) {
   const address = await requireAddress(req);
   if (!address) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const body = await req.json() as Record<string, unknown>;
-  const { walletAddress: _wa, ...updates } = body;
-  const existing = profileStore.get(address) ?? {};
-  profileStore.set(address, { ...existing, ...updates });
-  return NextResponse.json({ ok: true });
+  try {
+    const body = await req.json();
+    const current = profileStore.get(address) ?? {};
+    profileStore.set(address, { ...current, ...body });
+    
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
 }
