@@ -6,7 +6,7 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     name: v.string(),
-    password: v.string(), // hashed password
+    password: v.string(),
     avatar: v.optional(v.string()),
     role: v.union(v.literal("user"), v.literal("admin"), v.literal("operator")),
     isActive: v.boolean(),
@@ -19,7 +19,6 @@ export default defineSchema({
   .index("by_role", ["role"])
   .index("by_createdAt", ["createdAt"]),
 
-  // User sessions
   userSessions: defineTable({
     userId: v.id("users"),
     token: v.string(),
@@ -33,20 +32,18 @@ export default defineSchema({
   .index("by_userId", ["userId"])
   .index("by_expiresAt", ["expiresAt"]),
 
-  // User settings and preferences
   userSettings: defineTable({
     userId: v.id("users"),
     theme: v.union(v.literal("dark"), v.literal("light"), v.literal("auto")),
     language: v.string(),
     notifications: v.optional(v.any()),
-    apiKeys: v.optional(v.any()), // encrypted API keys
+    apiKeys: v.optional(v.any()),
     providerConfigs: v.optional(v.any()),
     preferences: v.optional(v.any()),
     updatedAt: v.number(),
   })
   .index("by_userId", ["userId"]),
 
-  // AI Providers
   aiProviders: defineTable({
     name: v.string(),
     type: v.union(v.literal("openai"), v.literal("anthropic"), v.literal("local"), v.literal("huggingface"), v.literal("custom")),
@@ -54,7 +51,7 @@ export default defineSchema({
     apiKeyRequired: v.boolean(),
     supportedModels: v.array(v.string()),
     maxTokens: v.optional(v.number()),
-    pricing: v.optional(v.any()), // pricing info per model
+    pricing: v.optional(v.any()),
     isActive: v.boolean(),
     createdBy: v.id("users"),
     createdAt: v.number(),
@@ -64,15 +61,14 @@ export default defineSchema({
   .index("by_createdBy", ["createdBy"])
   .index("by_active", ["isActive"]),
 
-  // AI Models
   aiModels: defineTable({
     providerId: v.id("aiProviders"),
     name: v.string(),
-    modelId: v.string(), // e.g., "gpt-4", "claude-3-opus"
+    modelId: v.string(),
     type: v.union(v.literal("chat"), v.literal("completion"), v.literal("embedding"), v.literal("image")),
     maxTokens: v.number(),
     costPerToken: v.optional(v.number()),
-    capabilities: v.array(v.string()), // e.g., ["function-calling", "vision", "code"]
+    capabilities: v.array(v.string()),
     isActive: v.boolean(),
     createdAt: v.number(),
   })
@@ -80,7 +76,6 @@ export default defineSchema({
   .index("by_type", ["type"])
   .index("by_active", ["isActive"]),
 
-  // User API Keys (encrypted storage)
   userApiKeys: defineTable({
     userId: v.id("users"),
     providerId: v.id("aiProviders"),
@@ -95,23 +90,17 @@ export default defineSchema({
   .index("by_providerId", ["providerId"])
   .index("by_active", ["isActive"]),
 
-  // Agent Registry - Enhanced Agent Profiles (ERC-8004 Inspired)
   agentProfiles: defineTable({
-    // Basic Identity
     name: v.string(),
     description: v.optional(v.string()),
     image_url: v.optional(v.string()),
     avatar_url: v.optional(v.string()),
-    
-    // Owner & Creator
     owner_id: v.string(),
     owner_address: v.string(),
     owner_ens: v.optional(v.string()),
     owner_username: v.optional(v.string()),
     owner_avatar_url: v.optional(v.string()),
     creator_address: v.string(),
-    
-    // Blockchain Integration
     agent_id: v.string(),
     token_id: v.string(),
     chain_id: v.number(),
@@ -119,19 +108,13 @@ export default defineSchema({
     is_testnet: v.boolean(),
     contract_address: v.string(),
     agent_wallet: v.string(),
-    
-    // Agent Classification
     agent_type: v.optional(v.string()),
     categories: v.array(v.string()),
     tags: v.array(v.string()),
     capabilities: v.array(v.string()),
-    
-    // Protocol Support
     supported_protocols: v.array(v.string()),
     supported_trust_models: v.array(v.string()),
     x402_supported: v.boolean(),
-    
-    // Services & Endpoints
     services: v.object({
       mcp: v.optional(v.object({
         name: v.string(),
@@ -183,8 +166,6 @@ export default defineSchema({
       last_checked: v.optional(v.string()),
       response_time: v.optional(v.number()),
     })),
-    
-    // Performance & Reputation
     is_verified: v.boolean(),
     is_active: v.boolean(),
     star_count: v.number(),
@@ -195,8 +176,6 @@ export default defineSchema({
     successful_validations: v.number(),
     average_score: v.number(),
     rank: v.optional(v.number()),
-    
-    // Health & Monitoring
     health_status: v.union(v.literal("healthy"), v.literal("degraded"), v.literal("unhealthy"), v.literal("unknown")),
     health_score: v.optional(v.number()),
     health_checked_at: v.optional(v.string()),
@@ -205,8 +184,6 @@ export default defineSchema({
     endpoint_verified_domain: v.optional(v.string()),
     endpoint_verification_error: v.optional(v.string()),
     endpoint_last_checked_at: v.optional(v.string()),
-    
-    // Scoring System
     scores: v.optional(v.object({
       execution_quality: v.number(),
       reliability: v.number(),
@@ -220,41 +197,21 @@ export default defineSchema({
     wallet_score: v.number(),
     freshness_score: v.number(),
     metadata_completeness_score: v.number(),
-    
-    // Metadata & Parsing
     parse_status: v.object({
       status: v.union(v.literal("success"), v.literal("error"), v.literal("warning")),
-      info: v.array(v.object({
-        code: v.string(),
-        field: v.string(),
-        message: v.string(),
-      })),
-      errors: v.array(v.object({
-        code: v.string(),
-        field: v.string(),
-        message: v.string(),
-      })),
-      warnings: v.array(v.object({
-        code: v.string(),
-        field: v.string(),
-        message: v.string(),
-      })),
+      info: v.array(v.object({ code: v.string(), field: v.string(), message: v.string() })),
+      errors: v.array(v.object({ code: v.string(), field: v.string(), message: v.string() })),
+      warnings: v.array(v.object({ code: v.string(), field: v.string(), message: v.string() })),
       llm_attempted: v.boolean(),
       last_parsed_at: v.string(),
       llm_attempted_at: v.optional(v.string()),
     }),
     raw_metadata: v.object({
-      onchain: v.array(v.object({
-        key: v.string(),
-        value: v.string(),
-        decoded: v.optional(v.string()),
-      })),
+      onchain: v.array(v.object({ key: v.string(), value: v.string(), decoded: v.optional(v.string()) })),
       offchain_uri: v.optional(v.string()),
       offchain_content: v.optional(v.any()),
     }),
     field_sources: v.record(v.string(), v.union(v.literal("onchain"), v.literal("offchain"), v.literal("hardcoded"), v.null())),
-    
-    // Decentralized Identity
     ens: v.optional(v.string()),
     did: v.optional(v.string()),
     mcp_server: v.optional(v.string()),
@@ -262,8 +219,6 @@ export default defineSchema({
     a2a_endpoint: v.optional(v.string()),
     a2a_version: v.optional(v.string()),
     agent_url: v.optional(v.string()),
-    
-    // Timestamps
     created_at: v.string(),
     updated_at: v.string(),
     created_block_number: v.optional(v.number()),
@@ -279,7 +234,6 @@ export default defineSchema({
   .index("by_is_active", ["is_active"])
   .index("by_created_at", ["created_at"]),
 
-  // Agent Feedback System
   agentFeedbacks: defineTable({
     agent_id: v.id("agentProfiles"),
     user_id: v.string(),
@@ -293,7 +247,6 @@ export default defineSchema({
   .index("by_score", ["score"])
   .index("by_created_at", ["created_at"]),
 
-  // Agent Health Checks
   agentHealthChecks: defineTable({
     agent_id: v.id("agentProfiles"),
     status: v.union(v.literal("healthy"), v.literal("degraded"), v.literal("unhealthy")),
@@ -311,7 +264,6 @@ export default defineSchema({
   .index("by_status", ["status"])
   .index("by_timestamp", ["timestamp"]),
 
-  // User-Agent Relationships
   userAgentRelationships: defineTable({
     user_id: v.string(),
     agent_id: v.id("agentProfiles"),
@@ -323,11 +275,10 @@ export default defineSchema({
   .index("by_agent_id", ["agent_id"])
   .index("by_relationship", ["relationship"]),
 
-  // Legacy agents (for backward compatibility)
   agents: defineTable({
     name: v.string(),
     description: v.string(),
-    walletAddress: v.string(), // The agent developer's MultiversX address
+    walletAddress: v.string(),
     capabilities: v.array(v.string()),
     isActive: v.boolean(),
     version: v.optional(v.string()),
@@ -337,7 +288,7 @@ export default defineSchema({
     preferredModel: v.optional(v.string()),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
-    lastUsed: v.optional(v.number())
+    lastUsed: v.optional(v.number()),
   })
   .index("by_walletAddress", ["walletAddress"])
   .index("by_sessionKey", ["sessionKey"])
@@ -345,27 +296,26 @@ export default defineSchema({
   .index("by_createdAt", ["createdAt"]),
 
   tasks: defineTable({
-    creatorAddress: v.string(), 
-    agentId: v.optional(v.id("agents")), 
-    prompt: v.string(), 
+    creatorAddress: v.string(),
+    agentId: v.optional(v.id("agents")),
+    prompt: v.string(),
     status: v.union(
-      v.literal("pending_deposit"), 
-      v.literal("funded"),          
-      v.literal("in_progress"),     
-      v.literal("completed"),       
-      v.literal("failed")           
+      v.literal("pending_deposit"),
+      v.literal("funded"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("failed")
     ),
-    paymentId: v.optional(v.number()), 
-    escrowAmount: v.string(), 
-    result: v.optional(v.string()), 
-    txHashDeposit: v.optional(v.string()), 
-    txHashRelease: v.optional(v.string()), 
+    paymentId: v.optional(v.number()),
+    escrowAmount: v.string(),
+    result: v.optional(v.string()),
+    txHashDeposit: v.optional(v.string()),
+    txHashRelease: v.optional(v.string()),
   })
   .index("by_creator", ["creatorAddress"])
   .index("by_status", ["status"])
   .index("by_agent", ["agentId"]),
 
-  // Agent communication channels
   agentChannels: defineTable({
     channelName: v.string(),
     participants: v.array(v.string()),
@@ -378,7 +328,6 @@ export default defineSchema({
   .index("by_type", ["channelType"])
   .index("by_activity", ["lastActivity"]),
 
-  // Agent messages in channels
   agentMessages: defineTable({
     channelId: v.id("agentChannels"),
     senderId: v.string(),
@@ -391,7 +340,6 @@ export default defineSchema({
   .index("by_sender", ["senderId"])
   .index("by_timestamp", ["timestamp"]),
 
-  // Agent delegations
   agentDelegations: defineTable({
     delegationId: v.string(),
     channelId: v.optional(v.id("agentChannels")),
@@ -409,7 +357,6 @@ export default defineSchema({
   .index("by_toAgent", ["toAgent"])
   .index("by_status", ["status"]),
 
-  // Agent heartbeats for real-time status
   agentHeartbeats: defineTable({
     agentId: v.string(),
     status: v.union(v.literal("online"), v.literal("busy"), v.literal("offline")),
@@ -422,7 +369,6 @@ export default defineSchema({
   .index("by_status", ["status"])
   .index("by_heartbeat", ["lastHeartbeat"]),
 
-  // Agent activities for logging
   agentActivities: defineTable({
     type: v.union(v.literal("sandbox_run"), v.literal("chat_message"), v.literal("delegate"), v.literal("file_upload"), v.literal("desktop_action"), v.literal("mcp_call")),
     agentId: v.optional(v.string()),
@@ -436,5 +382,32 @@ export default defineSchema({
   .index("by_type", ["type"])
   .index("by_status", ["status"])
   .index("by_createdAt", ["createdAt"]),
-});
 
+  // ─── M2M Auth ───────────────────────────────────────────────
+  mxUsers: defineTable({
+    mxAddress: v.string(),   // erd1...
+    apiKey: v.string(),      // ocl_<40 hex chars> — stable per user
+    budget: v.number(),      // EGLD balance available for skill execution
+    totalSpent: v.number(),  // cumulative EGLD spent
+    isActive: v.boolean(),
+    lastSeen: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+  .index("by_mxAddress", ["mxAddress"])
+  .index("by_apiKey", ["apiKey"]),
+
+  // ─── Audit Log ──────────────────────────────────────────────
+  auditLogs: defineTable({
+    apiKey: v.optional(v.string()),
+    mxAddress: v.optional(v.string()),
+    path: v.string(),
+    method: v.string(),
+    status: v.number(),
+    durationMs: v.optional(v.number()),
+    error: v.optional(v.string()),
+    ts: v.number(),
+  })
+  .index("by_apiKey", ["apiKey"])
+  .index("by_ts", ["ts"]),
+});
