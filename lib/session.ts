@@ -31,26 +31,20 @@ export async function verifySessionToken(token: string): Promise<Session | null>
 }
 
 /**
- * Lightweight sync check used in middleware.
- * Decodes JWT payload without cryptographic verification (verification happens in API routes).
- * Only checks structure + expiry.
+ * Lightweight sync decode used in Edge middleware.
+ * Does NOT verify signature — verification happens inside API route handlers.
  */
 export function getSessionFromRequest(req: NextRequest): { address: string } | null {
   const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
-
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
-
-    const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/').padEnd(
-      parts[1].length + ((4 - (parts[1].length % 4)) % 4), '='
-    );
-    const payload = JSON.parse(atob(padded)) as { address?: string; exp?: number };
-
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+      .padEnd(parts[1].length + ((4 - (parts[1].length % 4)) % 4), '=');
+    const payload = JSON.parse(atob(b64)) as { address?: string; exp?: number };
     if (!payload.address) return null;
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-
     return { address: payload.address };
   } catch {
     return null;

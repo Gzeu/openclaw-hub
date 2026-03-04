@@ -338,8 +338,3 @@ export const NATIVE_PLUGINS: NativePlugin[] = [
     ],
   },
 ];
-
-
-export function getPluginByKey(key: string): NativePlugin | undefined {
-  return NATIVE_PLUGINS.find((p) => p.key === key);
-}
