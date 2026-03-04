@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import { useGetIsLoggedIn, useGetLoginInfo } from '@multiversx/sdk-dapp/hooks'
-import AuthGuard from '@/components/AuthGuard'
-import UserProfile from '@/components/UserProfile'
 import WorkOSAuth from '@/components/WorkOSAuth'
 import MvxConnectButton from '@/components/MvxConnectButton'
 import { api } from '@/lib/api-client'
@@ -317,6 +316,8 @@ function SandboxPanel({
 
 // Main Page
 export default function AgentsPage() {
+  const pathname = usePathname()
+
   // MVX NativeAuth
   const isLoggedIn = useGetIsLoggedIn()
   const { tokenLogin } = useGetLoginInfo()
@@ -589,9 +590,7 @@ export default function AgentsPage() {
                 key={href}
                 href={href}
                 className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  href === '/agents'
-                    ? 'bg-violet-600/20 text-violet-300'
-                    : href === '/chat'
+                  pathname === href
                     ? 'bg-violet-600/20 text-violet-300'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                 }`}
