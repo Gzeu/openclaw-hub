@@ -1,19 +1,45 @@
 'use client'
-
-import { useState } from 'react'
-import { useGetAccountInfo, useGetLoginInfo } from '@multiversx/sdk-dapp/hooks'
-import { ExtensionLoginButton, WebWalletLoginButton, LedgerLoginButton, WalletConnectLoginButton } from '@multiversx/sdk-dapp/UI'
-import { logout } from '@multiversx/sdk-dapp/utils'
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Wallet, LogOut, ArrowRightLeft, Cpu, ShieldCheck, Zap } from 'lucide-react'
 
+interface MxSession {
+  address: string
+  balance?: string
+}
+
 export default function EconomyPage() {
-  const { address, account } = useGetAccountInfo()
-  const { isLoggedIn } = useGetLoginInfo()
+  const [session, setSession] = useState<MxSession | null>(null)
+  const [loading, setLoading] = useState(true)
   const [amountToDeposit, setAmountToDeposit] = useState('1.5')
+
+  useEffect(() => {
+    fetch('/api/auth/mx/session')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { setSession(data); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const isLoggedIn = !!session?.address
+  const address = session?.address ?? ''
+  const balance = session?.balance ?? '0'
 
   const formatBalance = (bal: string) => {
     if (!bal || bal === '0') return '0.0000'
     return (parseFloat(bal) / 1e18).toFixed(4)
+  }
+
+  const handleDisconnect = async () => {
+    await fetch('/api/auth/mx/logout', { method: 'POST' })
+    setSession(null)
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-12 text-center">
+        <div className="text-gray-400">Loading wallet status...</div>
+      </div>
+    )
   }
 
   return (
@@ -27,7 +53,6 @@ export default function EconomyPage() {
           Connect your MultiversX wallet to fund agents, pay for AI models, and participate in the on-chain agent marketplace.
         </p>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Wallet panel */}
         <div className="lg:col-span-1 space-y-6">
@@ -39,16 +64,12 @@ export default function EconomyPage() {
             {!isLoggedIn ? (
               <div className="space-y-4">
                 <p className="text-sm text-gray-400 mb-4">Connect via MultiversX to unlock economic features.</p>
-                <div className="flex flex-col gap-3">
-                  <ExtensionLoginButton callbackRoute="/economy" loginButtonText="DeFi Wallet Extension"
-                    buttonClassName="!bg-[#1a1a1a] !text-white !border !border-[#333] hover:!border-[#23F7DD] !rounded-lg !py-3 !w-full !flex !justify-center" />
-                  <WebWalletLoginButton callbackRoute="/economy" loginButtonText="Web Wallet"
-                    buttonClassName="!bg-[#1a1a1a] !text-white !border !border-[#333] hover:!border-[#23F7DD] !rounded-lg !py-3 !w-full !flex !justify-center" />
-                  <WalletConnectLoginButton callbackRoute="/economy" loginButtonText="xPortal App"
-                    buttonClassName="!bg-[#1a1a1a] !text-white !border !border-[#333] hover:!border-[#23F7DD] !rounded-lg !py-3 !w-full !flex !justify-center" />
-                  <LedgerLoginButton callbackRoute="/economy" loginButtonText="Ledger Hardware"
-                    buttonClassName="!bg-[#1a1a1a] !text-white !border !border-[#333] hover:!border-[#23F7DD] !rounded-lg !py-3 !w-full !flex !justify-center" />
-                </div>
+                <Link
+                  href="/login?from=/economy"
+                  className="block w-full text-center bg-[#23F7DD] text-black font-semibold py-3 rounded-lg hover:bg-[#23F7DD]/90 transition-colors"
+                >
+                  Connect xPortal Wallet
+                </Link>
               </div>
             ) : (
               <div className="space-y-6">
@@ -59,12 +80,12 @@ export default function EconomyPage() {
                 <div className="p-4 bg-gradient-to-br from-[#1a1a1a] to-[#111] rounded-lg border border-[#333]">
                   <div className="text-xs text-gray-500 mb-1">Wallet Balance</div>
                   <div className="text-3xl font-bold">
-                    {formatBalance(account?.balance ?? '0')}
+                    {formatBalance(balance)}
                     <span className="text-sm font-normal text-gray-400 ml-1">EGLD</span>
                   </div>
                 </div>
                 <button
-                  onClick={() => logout('/')}
+                  onClick={handleDisconnect}
                   className="w-full py-3 px-4 flex items-center justify-center gap-2 text-red-400 hover:bg-red-400/10 border border-transparent hover:border-red-400/20 rounded-lg transition-colors"
                 >
                   <LogOut size={18} /> Disconnect
@@ -73,7 +94,6 @@ export default function EconomyPage() {
             )}
           </div>
         </div>
-
         {/* Funding panel */}
         <div className="lg:col-span-2 space-y-6">
           <div className={`bg-[#111] border border-[#1e1e1e] rounded-xl p-6 relative overflow-hidden ${!isLoggedIn ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -130,7 +150,6 @@ export default function EconomyPage() {
               </div>
             </div>
           </div>
-
           <div className="bg-gradient-to-r from-[#23F7DD]/10 to-transparent border border-[#23F7DD]/20 rounded-xl p-6">
             <h3 className="font-semibold text-white mb-2">How the OpenClaw Economy Works</h3>
             <ul className="text-sm text-gray-400 space-y-2 list-disc pl-4">
