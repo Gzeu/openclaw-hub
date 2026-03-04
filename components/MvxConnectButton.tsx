@@ -1,52 +1,50 @@
 'use client'
-import { useState } from 'react'
-import { useGetIsLoggedIn } from '@multiversx/sdk-dapp/hooks'
-import { logout } from '@multiversx/sdk-dapp/utils'
-import { ExtensionLoginButton, WebWalletLoginButton } from '@multiversx/sdk-dapp/UI'
+import { usePathname, useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
 
+/**
+ * MvxConnectButton — NO sdk-dapp hooks, NO DappProvider needed.
+ * When not logged in → redirects to /login?from=<current page> (xPortal QR flow).
+ * When logged in    → shows truncated address + Disconnect button.
+ */
 export default function MvxConnectButton() {
-  const isLoggedIn = useGetIsLoggedIn()
-  const [showMethods, setShowMethods] = useState(false)
+  const { isLoggedIn, user, loading } = useAuth()
+  const pathname = usePathname()
+  const router   = useRouter()
 
-  const handleLogout = () => {
-    logout(`${window.location.origin}/wallet`)
-    localStorage.removeItem('auth-token') // Curățăm și vechiul token dacă există
+  if (loading) {
+    return (
+      <div className="px-4 py-1.5 rounded-lg bg-zinc-800 text-zinc-600 text-xs w-32 animate-pulse">
+        &nbsp;
+      </div>
+    )
   }
 
-  if (isLoggedIn) {
+  if (isLoggedIn && user) {
+    const short = `${user.address.slice(0, 6)}…${user.address.slice(-4)}`
     return (
-      <button
-        onClick={handleLogout}
-        className="px-4 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20 transition-all"
-      >
-        Disconnect Wallet
-      </button>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-zinc-400 font-mono hidden md:block">{short}</span>
+        <button
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' })
+            localStorage.removeItem('auth-token')
+            router.push('/login')
+          }}
+          className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-xs hover:bg-red-500/20 transition-all"
+        >
+          Disconnect
+        </button>
+      </div>
     )
   }
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setShowMethods(!showMethods)}
-        className="px-4 py-1.5 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 transition-all flex items-center gap-2"
-      >
-        <span>⚡</span> Connect MultiversX
-      </button>
-
-      {showMethods && (
-        <div className="absolute right-0 mt-2 p-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 min-w-[200px] flex flex-col gap-1">
-          <ExtensionLoginButton
-            callbackRoute="/agents"
-            loginButtonText="DeFi Wallet"
-            className="!bg-zinc-800 !border-zinc-700 !text-sm !py-2 !rounded-lg hover:!bg-zinc-700"
-          />
-          <WebWalletLoginButton
-            callbackRoute="/agents"
-            loginButtonText="Web Wallet"
-            className="!bg-zinc-800 !border-zinc-700 !text-sm !py-2 !rounded-lg hover:!bg-zinc-700"
-          />
-        </div>
-      )}
-    </div>
+    <button
+      onClick={() => router.push(`/login?from=${encodeURIComponent(pathname)}`)}
+      className="px-4 py-1.5 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 transition-all flex items-center gap-2"
+    >
+      <span>⚡</span> xPortal
+    </button>
   )
 }

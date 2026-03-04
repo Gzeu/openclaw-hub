@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useGetIsLoggedIn, useGetLoginInfo } from '@multiversx/sdk-dapp/hooks'
+import { useAuth } from '@/hooks/useAuth'
+import { useRouter } from 'next/navigation'
 import MvxConnectButton from '@/components/MvxConnectButton'
 import { api } from '@/lib/api-client'
 import AgentCommunicationsPanelFull from '@/components/AgentCommunicationsPanelFull'
@@ -314,14 +315,13 @@ function SandboxPanel({
 
 // Main Page
 export default function AgentsPage() {
-  // MVX NativeAuth
-  const isLoggedIn = useGetIsLoggedIn()
-  const { tokenLogin } = useGetLoginInfo()
-  const nativeAuthToken = tokenLogin?.nativeAuthToken
+  // Auth via cookie session — no DappProvider needed
+  const { isLoggedIn, loading: authLoading } = useAuth()
+  const router = useRouter()
 
+  // Bearer token for API calls (set by /login after NativeAuth verification)
   const getBearer = () =>
-    nativeAuthToken ||
-    (typeof window !== 'undefined' ? localStorage.getItem('auth-token') : null)
+    typeof window !== 'undefined' ? localStorage.getItem('auth-token') : null
 
   const [agents, setAgents] = useState<Agent[]>([])
   const [agentsLoading, setAgentsLoading] = useState(true)
@@ -520,26 +520,43 @@ export default function AgentsPage() {
     }
   }
 
+  // Show loading skeleton while checking auth
+  if (authLoading) {
+    return (
+      <div className="bg-[#0a0a0f] flex items-center justify-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-violet-500/20 border-t-violet-500 rounded-full animate-spin" />
+          <p className="text-zinc-500 text-sm">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Not authenticated — redirect to login
+  if (!isLoggedIn) {
+    return (
+      <div className="bg-[#0a0a0f] flex items-center justify-center p-6" style={{ minHeight: 'calc(100vh - 56px)' }}>
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl max-w-md text-center shadow-2xl">
+          <h2 className="text-2xl font-bold mb-2 text-white">🔐 Wallet Required</h2>
+          <p className="text-zinc-400 mb-8 text-sm leading-relaxed">
+            Conectează-te cu xPortal pentru a accesa agenții și a delega sarcini.
+          </p>
+          <button
+            onClick={() => router.push('/login?from=/agents')}
+            className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            <span>⚡</span> Connect xPortal
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-[#0a0a0f] text-white flex flex-col" style={{ minHeight: 'calc(100vh - 56px)' }}>
 
-      {/* Wallet overlay — shows when MVX wallet not connected */}
-      {!isLoggedIn && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-50 flex items-center justify-center p-6">
-          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-2xl max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
-            <h2 className="text-2xl font-bold mb-2 text-white">Wallet Required</h2>
-            <p className="text-zinc-400 mb-8 text-sm leading-relaxed">
-              Connect your MultiversX wallet to discover agents and delegate tasks.
-            </p>
-            <MvxConnectButton />
-          </div>
-        </div>
-      )}
-
-      {/* Main 3-panel layout — dimmed when wallet not connected */}
-      <div className={`flex-1 flex w-full ${
-        !isLoggedIn ? 'pointer-events-none select-none opacity-30' : ''
-      }`}>
+      {/* Main 3-panel layout */}
+      <div className="flex-1 flex w-full">
         {/* Panel 1 — Agent list */}
         <aside className="w-72 shrink-0 border-r border-zinc-800/80 flex flex-col">
           <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
