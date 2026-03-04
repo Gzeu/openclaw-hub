@@ -3,7 +3,7 @@ import { clearSessionCookie } from '@/lib/session';
 
 /**
  * POST /api/auth/logout
- * Clears the session cookie.
+ * Clears the mx_session cookie.
  */
 export async function POST() {
   const response = NextResponse.json({ ok: true });

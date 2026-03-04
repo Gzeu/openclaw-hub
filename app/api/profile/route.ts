@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
 
-/**
- * Simple in-memory profile store.
- * TODO: replace with Convex mutation/query or a KV store for persistence.
- */
+// In-memory store — TODO: migrate to Convex userSettings table
 const profileStore = new Map<string, Record<string, unknown>>();
 
 async function requireAddress(req: NextRequest): Promise<string | null> {
@@ -42,12 +39,8 @@ export async function PATCH(req: NextRequest) {
   if (!address) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json() as Record<string, unknown>;
-
-  // Prevent overwriting wallet address
   const { walletAddress: _wa, ...updates } = body;
-
   const existing = profileStore.get(address) ?? {};
   profileStore.set(address, { ...existing, ...updates });
-
   return NextResponse.json({ ok: true });
 }
