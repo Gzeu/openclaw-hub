@@ -8,7 +8,8 @@ type LoginStep = 'idle' | 'connecting' | 'waiting_scan' | 'verifying' | 'done' |
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const from = searchParams.get('from') ?? '/';
+  // Support both ?from= (middleware) and ?redirect= (legacy)
+  const from = searchParams.get('from') ?? searchParams.get('redirect') ?? '/';
 
   const [step, setStep] = useState<LoginStep>('idle');
   const [qrUri, setQrUri] = useState<string>('');
@@ -63,7 +64,6 @@ export default function LoginPage() {
       );
 
       await provider.init();
-
       const { uri, approval } = await provider.connect({
         methods: ['mvx_signNativeAuthToken', 'mvx_cancelAction'],
       });
@@ -82,6 +82,7 @@ export default function LoginPage() {
       const walletAddress =
         (loginResult as { address?: string }).address ??
         (await provider.getAddress());
+
       const signature =
         (loginResult as any).signature ??
         ((provider as any).getSignature
@@ -110,6 +111,8 @@ export default function LoginPage() {
 
       setAddress(walletAddress);
       setStep('done');
+
+      // Redirect after successful login — 'from' is set by middleware
       setTimeout(() => router.push(from), 800);
     } catch (err: unknown) {
       console.error('[Login]', err);
@@ -196,7 +199,7 @@ export default function LoginPage() {
           {step === 'done' && (
             <div className="text-center space-y-3 py-4">
               <div className="text-4xl">✅</div>
-              <p className="text-zinc-300 text-sm">Conectat!</p>
+              <p className="text-zinc-300 text-sm">Conectat! Se redirecționează...</p>
               <p className="text-cyan-400 font-mono text-xs">
                 {address.slice(0, 8)}...{address.slice(-6)}
               </p>
